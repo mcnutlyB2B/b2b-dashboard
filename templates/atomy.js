@@ -22,8 +22,8 @@ function tabSales(M){
   const d0=F(R,{noMk:true,noLn:true});
   K.progress(M,F(R),{note:'애터미는 주문 건별로 크게 들어와 날짜별 편차가 큽니다.'+(S.mk||S.ln?` 필터: ${[S.mk,S.ln].filter(Boolean).join(' · ')}.`:''),
     donut:{mode:S.dmode,setMode:k=>{S.dmode=k;K.render(true)},modes:[
-      {k:'ln',l:'제품별',rows:inR(d0,S.f,S.t),prevRows:y?inR(d0,y.f,y.t):null,key:'ln',name:k=>k,sel:S.ln,onPick:k=>{S.ln=S.ln===k?'':k;K.render(true)},hint:'조각을 누르면 그 제품만 봅니다. 오른쪽 끝은 전년 동기 대비.'},
-      {k:'mk',l:'시장별',rows:inR(d0,S.f,S.t),prevRows:y?inR(d0,y.f,y.t):null,key:'mk',name:k=>k,sel:S.mk,onPick:k=>{S.mk=S.mk===k?'':k;K.render(true)},hint:'조각을 누르면 그 시장만 봅니다. 오른쪽 끝은 전년 동기 대비.'}]}});
+      {k:'ln',l:'제품별',rows:inR(d0,S.f,S.t),prevRows:y?inR(d0,y.f,y.t):null,key:'ln',name:k=>k,sel:S.ln,onPick:k=>{S.ln=S.ln===k?'':k;K.render(true)},hint:'※ 항목을 클릭하면 해당 제품만 조회되며, 한 번 더 클릭하면 전체 보기로 돌아갑니다. 우측 증감률은 전년 동기 대비입니다.'},
+      {k:'mk',l:'시장별',rows:inR(d0,S.f,S.t),prevRows:y?inR(d0,y.f,y.t):null,key:'mk',name:k=>k,sel:S.mk,onPick:k=>{S.mk=S.mk===k?'':k;K.render(true)},hint:'※ 항목을 클릭하면 해당 시장만 조회되며, 한 번 더 클릭하면 전체 보기로 돌아갑니다. 우측 증감률은 전년 동기 대비입니다.'}]}});
   const base=F(R,{noCust:true}),cur=inR(base,S.f,S.t),prev=y?inR(base,y.f,y.t):null;
   const g=el('div',{class:'grid5'});
   const card=(lab,v,a,pa,on,click,big,fmt=amt)=>{const dx=delta(a,pa);return el('button',{class:'card'+(big?' big':'')+(on?' sel':'')+(click?'':' static'),onclick:click,title:fmt===amt?won(a):null},
@@ -35,8 +35,9 @@ function tabSales(M){
   g.append(card('판매 수량',nf(sum(fc,'q')),sum(fc,'q'),fp?sum(fp,'q'):null,false,null,false,nf),
            card('주문 전표',nf(docs(fc))+'건',docs(fc),fp?docs(fp):null,false,()=>{S.tab='order';K.render()},false,v=>nf(v)+'건'));
   M.append(g);
-  K.top10(M,F(R,{noMk:true}),{title:'상위 10개 시장 집중 관리',key:'mk',name:k=>k,onRow:k=>mkDrawer(k),unitLab:'시장',scope:'애터미'});
-  const mp=panel('월별 매출',`${S.cust!==''?D.custs[+S.cust]:'애터미 전체'}${S.mk?' · '+S.mk:''} · 막대를 누르면 그 달로`);
+  factors(M);
+  K.top10(M,F(R,{noMk:true}),{title:'상위 10개 시장 집중 관리',key:'mk',name:k=>k,onRow:k=>mkDrawer(k),unitLab:'시장',win:6});
+  const mp=panel('월별 매출',`${S.cust!==''?D.custs[+S.cust]:'애터미 전체'}${S.mk?' · '+S.mk:''} · ※ 막대를 클릭하면 해당 월로 조회 기간이 변경됩니다`);
   mp.append(K.legend([['var(--accent)',`${+S.t.slice(0,4)}년`],['var(--ghost)',`${+S.t.slice(0,4)-1}년`]]));
   const mc=el('div',{class:'pb'});mp.append(mc);M.append(mp);requestAnimationFrame(()=>K.monthly(mc,F(R)));
   // 시장별
@@ -44,7 +45,7 @@ function tabSales(M){
   const mm=groupBy(fr,'mk'),pm=fpr?groupBy(fpr,'mk'):null;
   const keys=[...new Set([...mm.keys(),...(pm?pm.keys():[])])];
   const mrows=keys.map(k=>{const all=F(R,{noMk:true}).filter(r=>r.mk===k);const cad=cadence(all);return{k,a:mm.get(k)?.a||0,q:mm.get(k)?.q||0,p:pm?(pm.get(k)?.a||0):null,last:cad.last,since:cad.since,gap:cad.gap,next:cad.next,late:cad.late,n:cad.n}});
-  const sp=panel('시장(국가)별',`${perName(S.f,S.t)} · 품명의 괄호(러시아용 등)로 구분, 괄호 없으면 국내 · 행을 누르면 그 시장만`);const sd=el('div');sp.append(sd);
+  const sp=panel('시장(국가)별',`${perName(S.f,S.t)} · 품명의 괄호(러시아용 등)로 구분, 괄호 없으면 국내 · ※ 행을 클릭하면 해당 시장만 조회되며, 한 번 더 클릭하면 전체 보기로 돌아갑니다`);const sd=el('div');sp.append(sd);
   table(sd,{id:'mk',rows:mrows,maxH:460,sort:{k:'a',d:-1},rowCls:r=>S.mk===r.k?'on':'',onRow:r=>{S.mk=S.mk===r.k?'':r.k;K.render(true)},
     sumRow:{k:'합계',a:amt(ft),p:fpr?amt(sum(fpr)):'',ch:dCell(ft,fpr?sum(fpr):null),q:nf(sum(fr,'q'))},
     cols:[{k:'k',l:'시장',cls:'name'},{k:'a',l:'매출',n:1,f:r=>amt(r.a),title:r=>won(r.a)},{k:'p',l:'전년 동기',n:1,f:r=>r.p==null?'—':amt(r.p)},{k:'ch',l:'증감',n:1,f:r=>dCell(r.a,r.p),nosort:1},{k:'s',l:'비중',n:1,f:r=>shareCell(r.a,ft),nosort:1},
@@ -62,13 +63,68 @@ function tabSales(M){
 
 // ══ 영업 액션
 function tabAction(M){
-  M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 최근 3개월·12개월로 판단합니다. 시장 단위.`}));
+  M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 시장별 발주 주기(최근 1년)로 판단합니다.`}));
   K.actions(M,F(R,{noMk:true}),{key:'mk',name:k=>k,onRow:k=>mkDrawer(k),unitLab:'시장',items:{label:'주요 제품',fn:rs=>{const g=groupBy(rs.filter(r=>r.d>=addD(MAX,-364)),'ln');return [...g.values()].sort((a,b)=>b.a-a.a).slice(0,3).map(o=>o.k).join(', ')}}});
 }
 
+
+// ── (가) 매출 증감 요인: 전년 동기 → 물량 → 단가 → 신규 제품 → 판매 중단 → 금년 (품목=시장별 SKU 기준)
+function factors(M){
+  const y=yoyOf(S.f,S.t);if(!y)return;
+  const cur=inR(F(R),S.f,S.t),prev=inR(F(R),y.f,y.t);const A1=sum(cur),A0=sum(prev);
+  const g1=groupBy(cur,'i'),g0=groupBy(prev,'i');let vol=0,price=0,neu=0,drop=0,etc=0;
+  new Set([...g1.keys(),...g0.keys()]).forEach(k=>{const a=g1.get(k),b=g0.get(k);const q1=a?a.q:0,q0=b?b.q:0,a1=a?a.a:0,a0=b?b.a:0;
+    if(q1>0&&q0>0){const p0=a0/q0,p1=a1/q1;vol+=(q1-q0)*p0;price+=(p1-p0)*q1}
+    else if(q1>0&&q0<=0&&a0===0)neu+=a1;else if(q0>0&&q1<=0&&a1===0)drop-=a0;else etc+=a1-a0});
+  // 평균 단가 변동 (양쪽 모두 판매된 품목)
+  let q1s=0,v1=0,v0=0;g1.forEach((o,k)=>{const b=g0.get(k);if(b&&o.q>0&&b.q>0){q1s+=o.q;v1+=o.a;v0+=b.a/b.q*o.q}});
+  const pc=v0?(v1-v0)/v0:null;
+  const steps=[['전년 동기',A0,'base'],['물량 효과',vol],['단가 효과',price],['신규 제품',neu],['판매 중단',drop]];
+  if(Math.abs(etc)>=1e4)steps.push(['기타 조정',etc]);steps.push(['금년',A1,'end']);
+  const p=K.panel('매출 증감 요인',`${perName(S.f,S.t)} vs 전년 동기 · 시장별 품목 기준`);
+  const dx=delta(A1,A0);
+  p.append(el('div',{class:'fsum'},el('span',{},'매출 ',el('b',{class:dx.c,text:`${A1-A0>=0?'+':''}${amt(A1-A0)} (${dx.t})`})),
+    el('span',{},'물량 효과 ',el('b',{class:vol>=0?'up':'down',text:`${vol>=0?'+':''}${amt(vol)}`})),
+    el('span',{},'단가 효과 ',el('b',{class:price>=0?'up':'down',text:`${price>=0?'+':''}${amt(price)}`}),pc!=null?el('span',{class:'note',text:` (평균 단가 ${pc>=0?'+':''}${(pc*100).toFixed(1)}%)`}):null),
+    el('span',{},'신규·중단 ',el('b',{class:neu+drop>=0?'up':'down',text:`${neu+drop>=0?'+':''}${amt(neu+drop)}`}))));
+  const host=el('div',{class:'pb'});p.append(host);
+  requestAnimationFrame(()=>{
+    const W=Math.max(300,host.clientWidth),H=210,pt=24,pb=26,n=steps.length,slot=W/n,bw=Math.min(70,slot*.6);
+    let run=0,vals=[];steps.forEach(([l,v,t])=>{if(t==='base'){vals.push([0,v]);run=v}else if(t==='end')vals.push([0,v]);else{vals.push([run,run+v]);run+=v}});
+    const mx=Math.max(1,...vals.flat()),mn=Math.min(0,...vals.flat());
+    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('width','100%');svg.style.display='block';
+    const yy=v=>pt+(H-pt-pb)*(mx-v)/(mx-mn);const mk=(t,a,txt)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.append(e);return e};
+    mk('line',{x1:0,x2:W,y1:yy(0),y2:yy(0),stroke:'var(--line)'});
+    steps.forEach(([l,v,t],i)=>{const[a,b]=vals[i];const cx=slot*i+slot/2,top=yy(Math.max(a,b)),h=Math.max(1,Math.abs(yy(a)-yy(b)));
+      const col=t==='base'?'var(--ghost)':t==='end'?'var(--accent)':v>=0?'var(--up)':'var(--down)';
+      const r=mk('rect',{x:cx-bw/2,y:top,width:bw,height:h,fill:col,rx:2,opacity:t?1:.85});
+      const tt=document.createElementNS(ns,'title');tt.textContent=`${l} ${won(v)}`;r.append(tt);
+      mk('text',{x:cx,y:top-6,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'var(--fg)'},t?amt(v):`${v>=0?'+':''}${amt(v)}`);
+      mk('text',{x:cx,y:H-7,'text-anchor':'middle','font-size':12,fill:'var(--muted)'},l);
+      if(i<n-1&&!t||t==='base'){const e=t==='base'?b:b;mk('line',{x1:cx+bw/2,x2:cx+slot-bw/2,y1:yy(e),y2:yy(e),stroke:'var(--faint)','stroke-dasharray':'3 3'})}});
+    host.append(svg)});
+  p.append(el('div',{class:'foot',style:'padding:0 16px 14px',text:'※ 물량 효과 = (금년 수량 − 전년 수량) × 전년 단가, 단가 효과 = (금년 단가 − 전년 단가) × 금년 수량. 두 기간 모두 판매된 품목 기준이며, 한쪽 기간에만 판매된 품목은 신규 제품·판매 중단으로 따로 표시합니다.'}));
+  M.append(p);
+}
+// ── (나) 신규 시장·제품 안착 현황: 올해 처음 주문된 품목(시장별 SKU)
+function newLaunch(M){
+  const all=F(R);const first={};all.forEach(r=>{if(r.a>0&&(!first[r.i]||r.d<first[r.i]))first[r.i]=r.d});
+  const rows=Object.keys(first).filter(k=>first[k]>=`${BY}-01-01`).map(k=>{k=+k;const rs=all.filter(r=>r.i===k&&r.a>0);const ds=[...new Set(rs.map(r=>r.d))].sort();
+    const it=D.items[k];const last=ds[ds.length-1];return{id:k,mk:it[7],ln:it[8],first:ds[0],n:ds.length,a:sum(all.filter(r=>r.i===k)),last,since:days(last,MAX)-1,fs:days(ds[0],MAX)-1}});
+  const ok=rows.filter(r=>r.n>=2).length;
+  const p=K.panel('신규 시장·제품 안착 현황',`${BY}년 처음 주문된 품목 ${rows.length}개 · 재주문 완료 ${ok}개 · 첫 주문만 ${rows.length-ok}개`);
+  const d=el('div');p.append(d);
+  table(d,{id:'launch',rows,maxH:460,sort:{k:'first',d:-1},onRow:r=>itemDrawer(r.id),empty:'올해 처음 주문된 품목이 없습니다.',
+    cols:[{k:'mk',l:'시장'},{k:'ln',l:'제품',cls:'name'},{k:'first',l:'첫 주문일',n:1,f:r=>r.first.slice(2).replace(/-/g,'.')},{k:'n',l:'주문 횟수',n:1,f:r=>r.n+'회'},
+      {k:'a',l:'누적 매출',n:1,f:r=>amt(r.a),title:r=>won(r.a)},{k:'last',l:'마지막 주문',n:1,f:r=>`${r.last.slice(2).replace(/-/g,'.')} (${r.since}일 전)`},
+      {k:'st',l:'상태',f:r=>r.n>=2?el('span',{class:'pill st-ok',text:'재주문 완료'}):el('span',{class:'pill '+(r.fs>90?'st-risk':'st-late'),text:`첫 주문 후 ${r.fs}일째 재주문 없음`})}]});
+  p.append(el('div',{class:'foot',style:'padding:8px 16px 14px',text:'※ 품목은 시장별 제품(예: 카페아라비카 50개입 러시아용) 단위입니다. 첫 주문 후 90일이 지나도 재주문이 없으면 빨간색으로 표시합니다. 행을 클릭하면 품목 상세가 열립니다.'}));
+  M.append(p);
+}
 // ══ 시장·품목
 function tabItem(M){
   K.lost(M,F(R),{key:'i',name:k=>D.items[k][1],onRow:k=>itemDrawer(k),unitLab:'품목'});
+  newLaunch(M);
   const y=yoyOf(S.f,S.t);const Y=+S.t.slice(0,4);const met=S.metric;const fmt=met==='a'?amt:nf;
   const months=[];for(let m=1;m<=12;m++)if(`${Y}-${pad(m)}`<=MAX.slice(0,7))months.push(m);
   const base=F(R,{noMk:true});const yr=base.filter(r=>r.y===Y),pcut=Y===BY?K.shiftY(MAX):`${Y-1}-12-31`,pyr=base.filter(r=>r.y===Y-1&&r.d<=pcut);
@@ -111,7 +167,7 @@ function tabOrder(M){
     mini('가장 큰 주문',pos.length?amt(Math.max(...pos.map(d=>d.a))):'—',el('span',{class:'flat',text:pos.length?md(pos.reduce((m,d)=>d.a>m.a?d:m).d):''})),
     mini('주문한 날',nf(new Set(pos.map(d=>d.d)).size)+'일'));
   M.append(g);
-  const p=panel('주문 전표',`${perName(S.f,S.t)} · 행을 누르면 품목 내역`);const td=el('div');p.append(td);
+  const p=panel('주문 전표',`${perName(S.f,S.t)} · ※ 행을 클릭하면 품목 내역이 열립니다`);const td=el('div');p.append(td);
   table(td,{id:'docs',rows:docs,maxH:640,sort:{k:'d',d:-1},onRow:r=>docDrawer(r),
     cols:[{k:'d',l:'일자',f:r=>r.d.slice(2).replace(/-/g,'.')},{k:'cust',l:'거래처'},{k:'mks',l:'시장',cls:'name',title:r=>r.mks},{k:'n',l:'품목 수',n:1},{k:'q',l:'수량',n:1,f:r=>nf(r.q)},{k:'a',l:'금액',n:1,f:r=>amt(r.a),title:r=>won(r.a)}]});
   M.append(p);
