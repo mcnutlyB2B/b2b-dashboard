@@ -101,7 +101,8 @@ main.wrap{padding-block:16px 48px;display:flex;flex-direction:column;gap:16px}
 .pbar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg);text-decoration:none}
 .pbar u span{position:absolute;top:22px;transform:translateX(-50%);font-size:11.5px;color:var(--muted);white-space:nowrap}
 .pbar em{position:absolute;right:0;top:-19px;font-size:11.5px;color:var(--muted);font-style:normal;white-space:nowrap}
-.pbar u.ly{background:var(--warn)}
+.pbar u.ly{background:var(--warn);width:4px;margin-left:-2px;top:-6px;bottom:-6px;border-radius:2px}
+.pbar u.ly span{color:var(--warn);font-weight:700;top:24px}
 .callout{grid-column:1/-1;font-size:12.5px;color:var(--muted);background:var(--panel2);border-radius:8px;padding:8px 10px}
 .prog .nums .callout b{color:var(--fg);font-size:inherit}
 /* 차트 */
@@ -200,3 +201,6 @@ details.panel .tw{margin:0;border-top:0}
   .dleg .dr{grid-template-columns:10px minmax(0,1fr) 34px 56px 58px;gap:6px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.fsum{display:flex;gap:22px;flex-wrap:wrap;padding:12px 16px 0;font-size:13px;color:var(--muted)}
+.fsum b{font-size:15px;font-variant-numeric:tabular-nums}
