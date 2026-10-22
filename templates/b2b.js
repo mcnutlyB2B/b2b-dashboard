@@ -47,12 +47,12 @@ function tabSales(M){
   const dr0=F(R,{noCat:true});
   K.progress(M,F(R),{note:S.type||S.rep||S.cat?`필터: ${[S.type,S.rep,S.cat].filter(Boolean).join(' · ')}.`:'',
     donut:{mode:S.dmode,setMode:k=>{S.dmode=k;K.render(true)},modes:[
-      {k:'cat',l:'품목 분류',rows:inR(dr0,S.f,S.t),prevRows:y?inR(dr0,y.f,y.t):null,key:catOf,name:k=>k,sel:S.cat,onPick:k=>{S.cat=S.cat===k?'':k;K.render(true)},hint:'조각을 누르면 아래 숫자·표가 그 분류만 보입니다. 맨 오른쪽은 전년 동기 대비.'},
-      {k:'item',l:'상위 품목',rows:inR(dr0,S.f,S.t),prevRows:y?inR(dr0,y.f,y.t):null,key:'i',name:k=>D.items[k][1],onPick:k=>itemDrawer(k),hint:'품목을 누르면 상세가 열립니다.'}]}});
+      {k:'cat',l:'품목 분류',rows:inR(dr0,S.f,S.t),prevRows:y?inR(dr0,y.f,y.t):null,key:catOf,name:k=>k,sel:S.cat,onPick:k=>{S.cat=S.cat===k?'':k;K.render(true)},hint:'※ 항목을 클릭하면 해당 분류만 조회되며, 한 번 더 클릭하면 전체 보기로 돌아갑니다. 우측 증감률은 전년 동기 대비입니다.'},
+      {k:'item',l:'상위 품목',rows:inR(dr0,S.f,S.t),prevRows:y?inR(dr0,y.f,y.t):null,key:'i',name:k=>D.items[k][1],onPick:k=>itemDrawer(k),hint:'※ 항목을 클릭하면 품목 상세 정보가 열립니다. 우측 증감률은 전년 동기 대비입니다.'}]}});
   // 유형세부 카드 (유형 필터 무관, 담당 필터 반영)
   const base=F(R,{noType:true}),cur=inR(base,S.f,S.t),prev=y?inR(base,y.f,y.t):null,tot=sum(cur);
   const g=el('div',{class:'grid5'});
-  const card=(lab,t,a,pa,big)=>{const dx=delta(a,pa);return el('button',{class:'card'+(big?' big':'')+((t&&S.type===t)||(big&&!S.type)?' sel':''),title:big?'누르면 유형 필터 해제':won(a),onclick:t?()=>{S.type=S.type===t?'':t;K.render(true)}:()=>{S.type='';K.render(true)}},
+  const card=(lab,t,a,pa,big)=>{const dx=delta(a,pa);return el('button',{class:'card'+(big?' big':'')+((t&&S.type===t)||(big&&!S.type)?' sel':''),title:big?'클릭 시 유형 필터 해제':won(a),onclick:t?()=>{S.type=S.type===t?'':t;K.render(true)}:()=>{S.type='';K.render(true)}},
     el('div',{class:'k'},t?dot(t):null,lab),el('div',{class:'v',text:amt(a)}),
     el('div',{class:'d'},el('span',{class:dx.c,text:y?dx.t:''}),el('span',{class:'flat',text:y?`전년 ${amt(pa)}`:''})),
     el('div',{class:'bar'},el('i',{style:`width:${tot?Math.max(0,Math.min(100,a/tot*100)):0}%;background:${t?TCOL[t]:'var(--accent)'}`})))};
@@ -60,9 +60,9 @@ function tabSales(M){
   const tm=groupBy(cur,'t'),pm=prev?groupBy(prev,'t'):new Map();
   TYPES.filter(t=>tm.has(t)||pm.has(t)).sort((a,b)=>(tm.get(b)?.a||0)-(tm.get(a)?.a||0)).forEach(t=>g.append(card(t,t,tm.get(t)?.a||0,y?(pm.get(t)?.a||0):null)));
   M.append(g);
-  K.top10(M,F(R),{title:'상위 10곳 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),scope:S.type||S.rep||S.cat?'필터한':'B2B'});
+  K.top10(M,F(R),{title:'상위 10곳 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k)});
   // 월별
-  const mp=panel('월별 매출',`${S.type||'B2B 전체'}${S.rep?' · '+S.rep:''} · 막대를 누르면 그 달로`);
+  const mp=panel('월별 매출',`${S.type||'B2B 전체'}${S.rep?' · '+S.rep:''} · ※ 막대를 클릭하면 해당 월로 조회 기간이 변경됩니다`);
   mp.append(K.legend([['var(--accent)',`${+S.t.slice(0,4)}년`],['var(--ghost)',`${+S.t.slice(0,4)-1}년`]]));
   const mc=el('div',{class:'pb'});mp.append(mc);M.append(mp);
   requestAnimationFrame(()=>K.monthly(mc,F(R)));
@@ -82,7 +82,7 @@ function tabSales(M){
 
 // ══ 영업 액션
 function tabAction(M){
-  M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 최근 3개월·12개월로 판단합니다.${S.rep?' 담당: '+S.rep:''}${S.type?' · 유형: '+S.type:''}`}));
+  M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 거래처별 발주 주기(최근 1년)로 판단합니다.${S.rep?' 담당: '+S.rep:''}${S.type?' · 유형: '+S.type:''}`}));
   K.actions(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),items:{label:'자주 사는 품목',fn:rs=>K.topItems(rs,k=>D.items[k][1])}});
 }
 
@@ -142,7 +142,7 @@ function tabRep(M){
   const Y=+S.t.slice(0,4);const months=[];for(let m=1;m<=12;m++){if(`${Y}-${pad(m)}`<=MAX.slice(0,7))months.push(m)}
   const yr=base.filter(r=>r.y===Y),pyr=base.filter(r=>r.y===Y-1);
   const lastM=months[months.length-1];const pcut=Y===BY?K.shiftY(MAX):`${Y-1}-12-31`;
-  const p2=panel('월별 실적표',`${Y}년 · 누계는 전년 같은 날짜까지와 비교 · 월을 누르면 그 달로`);const d2=el('div');p2.append(d2);
+  const p2=panel('월별 실적표',`${Y}년 · 누계는 전년 같은 날짜까지와 비교 · ※ 월 제목을 클릭하면 해당 월로 조회 기간이 변경됩니다`);const d2=el('div');p2.append(d2);
   const mrow=data.map(o=>{const x={p:o.p};months.forEach(m=>x['m'+m]=sum(yr.filter(r=>r[key]===o.p&&r.m===m)));x.s=sum(yr.filter(r=>r[key]===o.p));x.ps=sum(pyr.filter(r=>r[key]===o.p&&r.d<=pcut));return x});
   table(d2,{id:'rmon',rows:mrow,onRow:r=>repDrawer(r.p),maxH:460,sort:{k:'s',d:-1},
     sumRow:Object.assign({p:'합계',s:amt(sum(yr)),ps:amt(sum(pyr.filter(r=>r.d<=pcut))),ch:dCell(sum(yr),sum(pyr.filter(r=>r.d<=pcut)))},Object.fromEntries(months.map(m=>['m'+m,amt(sum(yr.filter(r=>r.m===m)))]))),
@@ -162,7 +162,7 @@ function tabRep(M){
 function tabItem(M){
   const y=yoyOf(S.f,S.t);const cur=inR(F(R,{noCat:true}),S.f,S.t),prev=y?inR(F(R,{noCat:true}),y.f,y.t):null;
   const cat=catOf;const cm=groupBy(cur,cat),pcm=prev?groupBy(prev,cat):new Map(),tot=sum(cur);
-  const p=panel('품목 중분류',`${perName(S.f,S.t)} · 세로선은 전년 동기 · 누르면 아래 표가 그 분류만`);
+  const p=panel('품목 중분류',`${perName(S.f,S.t)} · 세로선은 전년 동기 · ※ 항목을 클릭하면 해당 분류만 조회되며, 한 번 더 클릭하면 전체 보기로 돌아갑니다`);
   const hb=el('div',{class:'hbar pb'});const ks=[...new Set([...cm.keys(),...pcm.keys()])];const mx=Math.max(1,...ks.map(k=>Math.max(cm.get(k)?.a||0,pcm.get(k)?.a||0)));
   ks.sort((a,b)=>(cm.get(b)?.a||0)-(cm.get(a)?.a||0)).forEach(k=>{const a=cm.get(k)?.a||0,pa=y?(pcm.get(k)?.a||0):null;const dx=delta(a,pa);
     hb.append(el('div',{class:'hr'+(S.cat===k?' on':''),onclick:()=>{S.cat=S.cat===k?'':k;K.render(true)},title:`${won(a)}${pa!=null?' / 전년 '+won(pa):''}`},el('span',{class:'nm',text:k}),
@@ -195,7 +195,7 @@ function tabRet(M){
   M.append(g);
   const all=F(R).filter(r=>r.a<0);const Y=+S.t.slice(0,4);
   const list=[];for(let m=1;m<=12;m++){const k=`${Y}-${pad(m)}`;list.push({key:k,label:m+'월',tipT:`${m}월 반품·차감`,cur:k<=MAX.slice(0,7)?-sum(all.filter(r=>r.ym===k)):null,prev:`${Y-1}-${pad(m)}`>=MIN.slice(0,7)?-sum(all.filter(r=>r.ym===`${Y-1}-${pad(m)}`)):null})}
-  const p=panel('월별 반품·차감',`${Y}년 vs ${Y-1}년 · 누르면 그 달로`);const ch=el('div',{class:'pb'});p.append(ch);M.append(p);
+  const p=panel('월별 반품·차감',`${Y}년 vs ${Y-1}년 · ※ 막대를 클릭하면 해당 월로 조회 기간이 변경됩니다`);const ch=el('div',{class:'pb'});p.append(ch);M.append(p);
   requestAnimationFrame(()=>K.bars(ch,list,{h:180,color:'var(--down)',curName:`${Y}년`,prevName:`${Y-1}년`,onClick:b=>{if(b.cur==null)return;const[yy,m]=b.key.split('-').map(Number);K.setPer(b.key+'-01',eom(yy,m))}}));
   const g2=el('div',{class:'grid2'});
   const cp=panel('거래처별');const cd=el('div');cp.append(cd);
