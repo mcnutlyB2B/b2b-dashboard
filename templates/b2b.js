@@ -60,7 +60,7 @@ function tabSales(M){
   const tm=groupBy(cur,'t'),pm=prev?groupBy(prev,'t'):new Map();
   TYPES.filter(t=>tm.has(t)||pm.has(t)).sort((a,b)=>(tm.get(b)?.a||0)-(tm.get(a)?.a||0)).forEach(t=>g.append(card(t,t,tm.get(t)?.a||0,y?(pm.get(t)?.a||0):null)));
   M.append(g);
-  K.top10(M,F(R),{title:'상위 10곳 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k)});
+  K.top10(M,F(R),{title:'상위 10대 거래처 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k)});
   // 월별
   const mp=panel('월별 매출',`${S.type||'B2B 전체'}${S.rep?' · '+S.rep:''} · ※ 막대를 클릭하면 해당 월로 조회 기간이 변경됩니다`);
   mp.append(K.legend([['var(--accent)',`${+S.t.slice(0,4)}년`],['var(--ghost)',`${+S.t.slice(0,4)-1}년`]]));
@@ -83,7 +83,7 @@ function tabSales(M){
 // ══ 영업 액션
 function tabAction(M){
   M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 거래처별 발주 주기(최근 1년)로 판단합니다.${S.rep?' 담당: '+S.rep:''}${S.type?' · 유형: '+S.type:''}`}));
-  K.actions(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),items:{label:'자주 사는 품목',fn:rs=>K.topItems(rs,k=>D.items[k][1])}});
+  K.actions(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),items:{label:'주요 구매 품목',fn:rs=>K.topItems(rs,k=>D.items[k][1])}});
 }
 
 // ══ 거래처 관리
@@ -96,17 +96,17 @@ function tabCust(M){
   const neu=rows.filter(o=>o.st==='신규'),neuAmt=neu.reduce((s,o)=>s+o.cur,0);
   const g=el('div',{class:'grid4'});
   const mini=(k,v,d,st)=>el('button',{class:'card mini'+(S.custSt===st&&st?' sel':''),onclick:()=>{setSt(S.custSt===st?'':st)}},el('div',{class:'k',text:k}),el('div',{class:'v',text:v}),el('div',{class:'d'},d));
-  g.append(mini('거래 거래처',nf(nCur)+'곳',y?[dCell(nCur,nPrev),el('span',{class:'flat',text:`전년 동기 ${nPrev}곳`})]:'',''),
-    mini('신규 거래처',nf(neu.length)+'곳',el('span',{class:'flat',text:newOK()?`매출 ${amt(neuAmt)} · 처음 거래`:'판단에 1년치 이전 자료 필요'}),'신규'),
+  g.append(mini('거래 실적 거래처',nf(nCur)+'곳',y?[dCell(nCur,nPrev),el('span',{class:'flat',text:`전년 동기 ${nPrev}곳`})]:'',''),
+    mini('신규 거래처',nf(neu.length)+'곳',el('span',{class:'flat',text:newOK()?`매출 ${amt(neuAmt)} · 금년 첫 거래`:'판단에 1년치 이전 자료 필요'}),'신규'),
     mini('이탈 거래처',nf(lost.length)+'곳',el('span',{class:'down',text:y?`전년 동기 매출 ${amt(lostAmt)}`:'비교 기간 없음'}),'이탈'),
-    mini('주문 지연',nf(nLate)+'곳',el('span',{class:'flat',text:'평소 주문 간격의 1.5배 넘게 주문 없음'}),'지연'));
+    mini('주문 지연',nf(nLate)+'곳',el('span',{class:'flat',text:'평균 주문 간격의 1.5배 넘게 주문 없음'}),'지연'));
   M.append(g);
   const p=panel('거래처 관리',`${perName(S.f,S.t)}${y?' vs 전년 동기':''} · ${rows.length}곳`);
   const chips=el('div',{class:'tools'});
   [['','전체',rows.length],...['신규','재거래','성장','유지','감소','이탈','미거래'].filter(s=>cnt[s]).map(s=>[s,s,cnt[s]]),['지연','주문 지연',nLate]].forEach(([k,l,n])=>
     chips.append(el('button',{class:'chip'+(S.custSt===k?' on':''),onclick:()=>setSt(S.custSt===k?'':k)},`${l} ${n}`)));
   p.append(chips);
-  p.append(el('div',{class:'note',style:'padding:6px 16px 0',text:'성장·감소: 전년 동기 대비 ±10% · 이탈: 전년 동기엔 거래, 이번 기간엔 없음 · 재거래: 작년 동기엔 없었지만 예전 거래 있음 · 주문 지연: 최근 1년 3회 이상 주문한 거래처 중 평균 간격의 1.5배(최소 +10일) 넘게 주문 없음 · 담당은 현재 담당'}));
+  p.append(el('div',{class:'note',style:'padding:6px 16px 0',text:'성장·감소: 전년 동기 대비 ±10% · 이탈: 전년 동기엔 거래, 이번 기간엔 없음 · 재거래: 전년 동기엔 없었지만 예전 거래 있음 · 주문 지연: 최근 1년 3회 이상 주문한 거래처 중 평균 간격의 1.5배(최소 +10일) 넘게 주문 없음 · 담당은 현재 담당'}));
   const tools=el('div',{class:'tools'});const q=el('input',{id:'cq',type:'search',placeholder:'거래처 검색',value:S.cq});tools.append(q);p.append(tools);
   const td=el('div');p.append(td);
   const draw=()=>{td.innerHTML='';const k=S.cq.toLowerCase();
@@ -116,8 +116,8 @@ function tabCust(M){
         {k:'cur',l:'기간 매출',n:1,f:r=>amt(r.cur),title:r=>won(r.cur)},{k:'prev',l:'전년 동기',n:1,f:r=>r.prev==null?'—':amt(r.prev)},{k:'ch',l:'증감',n:1,f:r=>dCell(r.cur,r.prev)},
         {k:'ly',l:`${BY-1}년`,n:1,f:r=>r.ly?amt(r.ly):'—'},{k:'ytd',l:`${BY}년 누계`,n:1,f:r=>r.ytd?amt(r.ytd):'—'},
         {k:'n',l:'주문(1년)',n:1,f:r=>r.n?r.n+'회':'—',tip:'최근 1년 주문한 날 수'},{k:'gap',l:'평균 간격',n:1,f:r=>r.gap?r.gap+'일':'—'},
-        {k:'since',l:'마지막 주문',n:1,f:r=>r.last?el('span',{class:r.late?'st-late':'',text:`${r.last.slice(2).replace(/-/g,'.')} (${r.since}일 전)`}):'—'},
-        {k:'next',l:'다음 예상',n:1,f:r=>r.next?el('span',{class:r.late?'st-late':'',text:md(r.next)+(r.late?' 지남':'')}):'—'},
+        {k:'since',l:'최종 주문일',n:1,f:r=>r.last?el('span',{class:r.late?'st-late':'',text:`${r.last.slice(2).replace(/-/g,'.')} (${r.since}일 전)`}):'—'},
+        {k:'next',l:'차기 발주 예상일',n:1,f:r=>r.next?el('span',{class:r.late?'st-late':'',text:md(r.next)+(r.late?' 지남':'')}):'—'},
         {k:'st',l:'상태',f:r=>el('span',{},pill(r.st),r.late?[' ',pill('지연','st-late')]:null)}]})};
   q.oninput=()=>{S.cq=q.value;draw()};draw();M.append(p);
 }
@@ -217,7 +217,7 @@ function common(dr,all,id,kindRows){
   const y=yoyOf(S.f,S.t);const cur=inR(all,S.f,S.t),prev=y?inR(all,y.f,y.t):null;
   const a=sum(cur),pa=prev?sum(prev):null,dx=delta(a,pa);const cad=cadence(all);
   dr.append(K.stats([[perName(S.f,S.t),amt(a),'',won(a)],['전년 동기 대비',y?dx.t:'—',dx.c],[`${BY}년 누계`,amt(sum(all.filter(r=>r.y===BY)))],[`${BY-1}년 전체`,amt(sum(all.filter(r=>r.y===BY-1)))],
-    ['마지막 주문',cad.last?`${md(cad.last)} (${cad.since}일 전)`:'—',cad.late?'st-late':''],['주문 간격 · 다음 예상',cad.gap?`${cad.gap}일 · ${md(cad.next)}`:'—',cad.late?'st-late':'']]));
+    ['최종 주문일',cad.last?`${md(cad.last)} (${cad.since}일 전)`:'—',cad.late?'st-late':''],['주문 간격 · 차기 발주 예상일',cad.gap?`${cad.gap}일 · ${md(cad.next)}`:'—',cad.late?'st-late':'']]));
   const mp=panel('월별 매출',`${BY}년 vs ${BY-1}년`);mp.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});mp.append(mc);dr.append(mp);K.monthly2(mc,all);
   return{cur,prev};
 }
