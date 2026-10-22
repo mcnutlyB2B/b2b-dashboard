@@ -133,7 +133,7 @@ function bars(outer,list,{onClick,hl,dimOthers=false,h=220,labels='auto',fmt=amt
       if(b.prev!=null)tip.append(el('div',{},el('span',{style:'color:var(--ghost)',text:'■ '}),`${prevName} ${fmt===amt?won(b.prev):fmt(b.prev)}`));
       if(b.cur!=null&&b.prev!=null){const x=delta(b.cur,b.prev);tip.append(el('div',{class:x.c,text:x.t}))}
       if(b.extra)tip.append(el('div',{class:'note',text:b.extra}));
-      if(onClick)tip.append(el('div',{class:'note',text:'누르면 이 기간으로 보기'}));
+      if(onClick)tip.append(el('div',{class:'note',text:'클릭 시 해당 기간으로 조회'}));
       const hb=host.getBoundingClientRect();let x=ev.clientX-hb.left+12;const tw=tip.offsetWidth;if(x+tw>hb.width)x=ev.clientX-hb.left-tw-12;tip.style.left=Math.max(0,x)+'px';tip.style.top=Math.max(0,ev.clientY-hb.top-10)+'px'});
     g.addEventListener('mouseleave',()=>tip.hidden=true);
     if(onClick)g.addEventListener('click',()=>{tip.hidden=true;onClick(b)});
@@ -191,12 +191,12 @@ K.progress=function(host,rows,{note,donut}={}){
   const pr=ref>0?cur/ref:null;
   if(pr!=null){const sc=Math.max(1,pr);const bar=el('div',{class:'pbar',title:`${refLab} 대비 ${(pr*100).toFixed(1)}%`},el('i',{style:`width:${pr/sc*100}%`}),el('em',{text:`${refLab} ${amt(ref)} = 100%`}));
     if(sc>1)bar.append(el('u',{style:`left:${100/sc}%`},el('span',{text:'100%'})));
-    if(ongoing&&ly!=null)bar.append(el('u',{class:'ly',style:`left:${Math.min(100,ly/ref/sc*100)}%`},el('span',{text:`작년 이맘때 ${(ly/ref*100).toFixed(0)}%`})));
+    if(ongoing&&ly!=null)bar.append(el('u',{class:'ly',style:`left:${Math.min(100,ly/ref/sc*100)}%`},el('span',{text:`▲ 전년 동기 진척률 ${(ly/ref*100).toFixed(0)}%`})));
     nums.append(bar)}
   const g=el('div',{class:'mini3'});
-  g.append(el('div',{},el('small',{text:ongoing?`${refLab} 대비 진행률`:'전년 동기 대비 달성률'}),el('b',{text:pr!=null?(pr*100).toFixed(1)+'%':'—'})));
+  g.append(el('div',{},el('small',{text:ongoing?`${refLab} 대비 진척률`:'전년 동기 대비 달성률'}),el('b',{text:pr!=null?(pr*100).toFixed(1)+'%':'—'})));
   if(ongoing){let rem=0;for(let d=addD(MAX,1);d<=me;d=addD(d,1)){const w=wk(d);if(w&&w<6)rem++}
-    g.append(el('div',{},el('small',{text:`${refLab} 수준까지`}),el('b',{text:cur>=ref?'달성':amt(ref-cur)}),el('span',{class:'note',text:` · 남은 평일 ${rem}일`})))}
+    g.append(el('div',{},el('small',{text:`${refLab} 대비 잔여액`}),el('b',{text:cur>=ref?'달성':amt(ref-cur)}),el('span',{class:'note',text:` · 잔여 영업일 ${rem}일`})))}
   else g.append(el('div',{},el('small',{text:'전년 동기와 차이'}),el('b',{class:dx.c,text:y?(cur-ly>=0?'+':'')+amt(cur-ly):'—'})));
   if(!isYTD()){const ytd=sum(inR(rows,`${BY}-01-01`,MAX)),lytd=sum(inR(rows,`${BY-1}-01-01`,shiftY(MAX))),dy=delta(ytd,`${BY-1}-01-01`>=MIN?lytd:null);
     g.append(el('div',{},el('small',{text:`올해 누계 (1/1~${+MAX.slice(5,7)}/${BD})`}),el('b',{text:amt(ytd)}),' ',el('span',{class:dy.c,text:dy.t==='—'?'':dy.t})))}
@@ -247,72 +247,71 @@ K.donutBox=function(dn){
   return box;
 };
 
-// ── 신호: 최근 12개월, 최근 3개월 vs 작년 같은 3개월, 주문 주기
-const D12=addD(MAX,-364),D3=addD(MAX,-90);
-K.sig=function(rows){
-  const r12=sum(rows.filter(r=>r.d>=D12)),l3=sum(rows.filter(r=>r.d>=D3)),ly3f=shiftY(D3),ly3t=shiftY(MAX);
-  const ly3=ly3f>=MIN?sum(inR(rows,ly3f,ly3t)):null;const cad=cadence(rows);
+// ── 신호: 최근 12개월, 최근 N개월 vs 작년 같은 N개월(B2B 3개월·애터미 6개월), 주문 주기
+const D12=addD(MAX,-364);
+K.sig=function(rows,win=3){
+  const from=addD(MAX,-Math.round(win*30.4));
+  const r12=sum(rows.filter(r=>r.d>=D12)),l3=sum(rows.filter(r=>r.d>=from)),lyf=shiftY(from),lyt=shiftY(MAX);
+  const ly3=lyf>=MIN?sum(inR(rows,lyf,lyt)):null;const cad=cadence(rows);
   const ch3=ly3?(l3-ly3)/Math.abs(ly3):null;
-  const s={r12,l3,ly3,ch3,cad,tags:[]};
+  const s={r12,l3,ly3,ch3,cad,win,tags:[]};
   if(ly3>0&&ch3<=-0.3)s.tags.push(l3<=0?'이탈 위험':'급감');
   if(cad.late)s.tags.push('주문 지연');
-  if(cad.next&&!cad.late&&cad.next>=MAX&&cad.next<=addD(MAX,7))s.tags.push('주문 예정');
   if(ly3>0&&ch3>=0.2)s.tags.push('성장');
   return s;
 };
-const TAGC={'이탈 위험':'st-risk','급감':'st-risk','주문 지연':'st-late','주문 예정':'st-new','성장':'st-ok'};
+const TAGC={'이탈 위험':'st-risk','급감':'st-risk','주문 지연':'st-late','발주 예정':'st-new','주기 초과':'st-late','장기 미발주':'st-dorm','성장':'st-ok'};
 K.tag=t=>el('span',{class:'pill '+(TAGC[t]||''),text:t});
-// 최근 13개월 미니 막대 (작년 같은 달 겹침)
-K.spark=function(rows){
-  const ns='http://www.w3.org/2000/svg',W=130,H=30,svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('class','spark');
-  const ms=[];let y=BY,m=BM;for(let i=0;i<13;i++){ms.unshift([y,m]);m--;if(m<1){m=12;y--}}
-  const v=ms.map(([yy,mm])=>{const k=`${yy}-${pad(mm)}`,pk=`${yy-1}-${pad(mm)}`;return[sum(rows.filter(r=>r.ym===k)),pk>=MIN.slice(0,7)?sum(rows.filter(r=>r.ym===pk)):0]});
-  const mx=Math.max(1,...v.flat());const sl=W/13;
-  v.forEach(([c,p],i)=>{const x=i*sl;
-    if(p>0){const h=p/mx*(H-2);const r=document.createElementNS(ns,'rect');r.setAttribute('x',x+.5);r.setAttribute('y',H-h);r.setAttribute('width',sl-1);r.setAttribute('height',h);r.setAttribute('fill','var(--ghost)');svg.append(r)}
-    if(c>0){const h=c/mx*(H-2);const r=document.createElementNS(ns,'rect');r.setAttribute('x',x+sl*.2);r.setAttribute('y',H-h);r.setAttribute('width',sl*.6);r.setAttribute('height',h);r.setAttribute('fill',i===12?'var(--accent)':'var(--accent)');r.setAttribute('opacity',i===12?1:.75);svg.append(r)}});
-  const t=document.createElementNS(ns,'title');t.textContent=`최근 13개월 (${ms[0][0]}.${ms[0][1]}~${BY}.${BM}) · 연한 막대 = 작년 같은 달`;svg.append(t);
-  return svg;
-};
-// 상위 10곳 집중 관리
-K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',scope='전체'}){
-  const y=yoyOf(S.f,S.t);const g=groupBy(rows.filter(r=>r.d>=D12),key);const tot12=sum(rows.filter(r=>r.d>=D12));
-  const top=[...g.values()].sort((a,b)=>b.a-a.a).slice(0,10).map(o=>{const all=rows.filter(r=>r[key]===o.k);const s=K.sig(all);
-    return{k:o.k,name:name(o.k),sub:sub?sub(o.k):'',r12:o.a,cur:sum(inR(all,S.f,S.t)),prev:y?sum(inR(all,y.f,y.t)):null,s,all}});
-  const share=tot12?sum(top,'r12')/tot12:0;
-  const p=K.panel(title,`최근 12개월 매출 상위 10${unitLab==='거래처'?'곳':'개'} · ${scope} 매출의 ${(share*100).toFixed(0)}% · 빨강 최근 3개월 −30% 이하 · 주황 주문 지연 · 초록 +20% 이상`);
+// 상위 10곳 집중 관리: 최근 12개월 매출 상위 10. 금월·금년 누계를 전년 같은 날짜까지와 비교
+K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',win=3}){
+  const g=groupBy(rows.filter(r=>r.d>=D12),key);
+  const mf=`${BY}-${pad(BM)}-01`,yf=`${BY}-01-01`,lmf=shiftY(mf),lyf=shiftY(yf),lt=shiftY(MAX),lme=eom(BY-1,BM);
+  const top=[...g.values()].sort((a,b)=>b.a-a.a).slice(0,10).map(o=>{const all=rows.filter(r=>r[key]===o.k);
+    const ytd=sum(inR(all,yf,MAX)),lytd=lyf>=MIN?sum(inR(all,lyf,lt)):null;
+    return{k:o.k,name:name(o.k),sub:sub?sub(o.k):'',r12:o.a,mtd:sum(inR(all,mf,MAX)),lmtd:lmf>=MIN?sum(inR(all,lmf,lt)):null,lmfull:lmf>=MIN?sum(inR(all,lmf,lme)):null,
+      ytd,lytd,gr:lytd?(ytd-lytd)/Math.abs(lytd):null,s:K.sig(all,win)}});
+  const p=K.panel(title,`최근 12개월 매출 상위 10${unitLab==='거래처'?'곳':'개'} · 전년 수치는 같은 날짜까지 · 신호: 빨강 최근 ${win}개월 전년 대비 −30% 이하, 주황 주문 지연, 초록 +20% 이상`);
   const d=el('div');p.append(d);
   table(d,{id:'top10-'+key,rows:top,maxH:560,sort:{k:'r12',d:-1},onRow:r=>onRow(r.k),
-    cols:[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:unitLab,cls:'name',title:r=>r.name},...(sub?[{k:'sub',l:'담당'}]:[]),{k:'r12',l:'12개월 매출',n:1,f:r=>amt(r.r12),title:r=>won(r.r12)},{k:'sh',l:'비중',n:1,f:r=>K.shareCell(r.r12,tot12),nosort:1},
-      {k:'sp',l:'최근 13개월',f:r=>K.spark(r.all),nosort:1},{k:'cur',l:perName(S.f,S.t),n:1,f:r=>amt(r.cur)},{k:'cd',l:'전년 동기 대비',n:1,f:r=>dCell(r.cur,r.prev),nosort:1},
-      {k:'c3',l:'최근 3개월',n:1,tip:'최근 3개월 vs 작년 같은 3개월',f:r=>r.s.ly3==null?'—':dCell(r.s.l3,r.s.ly3),nosort:1},
-      {k:'tg',l:'신호',f:r=>{const t=r.s.tags.filter(x=>x!=='주문 예정');return t.length?el('span',{class:'tags'},...t.map(K.tag)):el('span',{class:'flat',text:'—'})},nosort:1}]});
+    cols:[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:unitLab,cls:'name',title:r=>r.name},...(sub?[{k:'sub',l:'담당'}]:[]),
+      {k:'mtd',l:`금월 누계 (${BM}/1~${BM}/${BD})`,n:1,f:r=>amt(r.mtd),title:r=>won(r.mtd)},
+      {k:'lmtd',l:'전년 동월',n:1,f:r=>r.lmtd==null?'—':amt(r.lmtd),title:r=>r.lmfull==null?null:`전년 ${BM}/1~${BM}/${BD} ${won(r.lmtd)} · 전년 ${BM}월 전체 ${won(r.lmfull)}`},
+      {k:'ytd',l:'금년 누계',n:1,f:r=>amt(r.ytd),title:r=>won(r.ytd)},
+      {k:'lytd',l:'전년 누계',n:1,f:r=>r.lytd==null?'—':amt(r.lytd),title:r=>r.lytd==null?null:won(r.lytd)},
+      {k:'gr',l:'성장률',n:1,tip:'금년 누계 vs 전년 누계 (같은 날짜까지)',f:r=>dCell(r.ytd,r.lytd)},
+      {k:'tg',l:'신호',f:r=>r.s.tags.length?el('span',{class:'tags'},...r.s.tags.map(K.tag)):el('span',{class:'flat',text:'—'}),nosort:1}]});
   host.append(p);
 };
-// 영업 액션 목록
-K.actions=function(host,rows,{key,name,sub,onRow,minAmt=12e6,items,unitLab='거래처'}){
-  const g=groupBy(rows,key);const list=[];
-  g.forEach((o,k)=>{const s=K.sig(o.rows);if(s.r12<minAmt)return;const tags=s.tags.filter(t=>t!=='성장');if(!tags.length)return;list.push({k,name:name(k),sub:sub?sub(k):'',s,tags,r12:s.r12,rows:o.rows})});
-  const cnt=t=>list.filter(o=>o.tags.includes(t)).length;
-  const T=['주문 예정','주문 지연','이탈 위험','급감'];
+// 영업 액션: 발주 주기 기준 (최근 1년 3회 이상 주문)
+K.actions=function(host,rows,{key,name,sub,onRow,items,unitLab='거래처'}){
+  const g=groupBy(rows,key);const list=[];const cw=unitLab==='거래처'?'곳':'개';
+  g.forEach((o,k)=>{const c=cadence(o.rows);if(!c.gap)return;
+    let st=null;
+    if(c.late)st=c.since>c.gap*3?'장기 미발주':'주기 초과';
+    else if(c.next&&c.next>=MAX&&c.next<=addD(MAX,7))st='발주 예정';
+    if(!st)return;
+    list.push({k,name:name(k),sub:sub?sub(k):'',st,gap:c.gap,last:c.last,since:c.since,over:c.since-c.gap,next:c.next,n:c.n,r12:sum(o.rows.filter(r=>r.d>=D12)),rows:o.rows})});
+  const by=t=>list.filter(o=>o.st===t);
   const sel=S.act||'';
-  const gr=el('div',{class:'grid4'});
-  const desc={'주문 예정':'다음 주문 예상일이 7일 안','주문 지연':'평소 주문 간격의 1.5배 넘게 주문 없음','이탈 위험':'작년 같은 3개월엔 거래, 최근 3개월 없음','급감':'최근 3개월이 작년 같은 3개월보다 30% 이상 감소'};
-  T.forEach(t=>gr.append(el('button',{class:'card mini'+(sel===t?' sel':''),onclick:()=>{S.act=sel===t?'':t;render(true)}},el('div',{class:'k'},K.tag(t)),el('div',{class:'v',text:cnt(t)+(unitLab==='거래처'?'곳':'개')}),el('div',{class:'d'},el('span',{class:'flat',text:desc[t]})))));
+  const desc={'발주 예정':'다음 발주 예상일이 7일 이내','주기 초과':'마지막 주문 후 평소 주기의 1.5배~3배 경과','장기 미발주':'평소 주기의 3배 이상 주문 없음 (이탈 가능성)'};
+  const gr=el('div',{class:'grid3'});
+  ['발주 예정','주기 초과','장기 미발주'].forEach(t=>gr.append(el('button',{class:'card mini'+(sel===t?' sel':''),onclick:()=>{S.act=sel===t?'':t;render(true)}},el('div',{class:'k'},K.tag(t)),el('div',{class:'v',text:by(t).length+cw}),el('div',{class:'d'},el('span',{class:'flat',text:desc[t]})))));
   host.append(gr);
-  const p=K.panel('연락할 '+unitLab,`최근 12개월 매출 ${amt(minAmt)} 이상(월 100만 원) 중 신호가 있는 ${unitLab} · 12개월 매출 큰 순${sel?' · '+sel+'만':''}`);
-  const d=el('div');p.append(d);
-  const why=o=>{const s=o.s,c=s.cad,out=[];
-    if(o.tags.includes('주문 예정'))out.push(`${md(c.next)} 주문 예상 (평소 ${c.gap}일 간격)`);
-    if(o.tags.includes('주문 지연'))out.push(`마지막 주문 ${c.since}일 전 · 평소 ${c.gap}일 간격`);
-    if(o.tags.includes('이탈 위험'))out.push(`최근 3개월 0 · 작년 같은 기간 ${amt(s.ly3)}`);
-    if(o.tags.includes('급감'))out.push(`최근 3개월 ${amt(s.l3)} · 작년 ${amt(s.ly3)}`);
-    return out.join(' / ')};
-  table(d,{id:'act-'+key,rows:list.filter(o=>!sel||o.tags.includes(sel)),maxH:640,sort:{k:'r12',d:-1},onRow:r=>onRow(r.k),empty:'해당 항목이 없습니다.',
-    cols:[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:unitLab,cls:'name',title:r=>r.name},...(sub?[{k:'sub',l:'담당'}]:[]),{k:'tg',l:'사유',f:r=>el('span',{class:'tags'},...r.tags.map(K.tag)),nosort:1},
-      {k:'why',l:'근거',f:r=>why(r),cls:'w',nosort:1},{k:'r12',l:'12개월 매출',n:1,f:r=>amt(r.r12),title:r=>won(r.r12)},
-      {k:'last',l:'마지막 주문',n:1,f:r=>r.s.cad.last?r.s.cad.last.slice(2).replace(/-/g,'.'):'—'},{k:'it',l:items.label,f:r=>items.fn(r.rows),cls:'name w2',title:r=>items.fn(r.rows),nosort:1}]});
-  host.append(p);
+  const cols=[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:unitLab,cls:'name',title:r=>r.name},...(sub?[{k:'sub',l:'담당'}]:[]),{k:'st',l:'구분',f:r=>K.tag(r.st)},
+    {k:'gap',l:'평소 주기',n:1,f:r=>r.gap+'일',tip:'최근 1년 주문 간격 평균'},{k:'last',l:'마지막 주문',n:1,f:r=>r.last.slice(2).replace(/-/g,'.')},
+    {k:'since',l:'경과일',n:1,f:r=>r.since+'일'},{k:'over',l:'주기 초과',n:1,f:r=>r.st==='발주 예정'?'—':el('span',{class:r.st==='장기 미발주'?'flat':'st-late',text:`+${r.over}일`})},
+    {k:'next',l:'다음 예상',n:1,f:r=>md(r.next)},{k:'r12',l:'12개월 매출',n:1,f:r=>amt(r.r12),title:r=>won(r.r12)},
+    {k:'it',l:items.label,f:r=>items.fn(r.rows),cls:'name w2',title:r=>items.fn(r.rows),nosort:1}];
+  const main=list.filter(o=>o.st!=='장기 미발주'&&(!sel||o.st===sel));
+  if(sel!=='장기 미발주'){
+    const p=K.panel('연락할 '+unitLab,`최근 1년 3회 이상 주문한 ${unitLab} 중 발주 예정·주기 초과 · 주기 초과 일수가 큰 순${sel?' · '+sel+'만':''}`);
+    const d=el('div');p.append(d);
+    table(d,{id:'act-'+key,rows:main.map(o=>Object.assign(o,{ord:o.st==='발주 예정'?-1e6+days(MAX,o.next):o.over})),maxH:640,sort:{k:'ord',d:-1},onRow:r=>onRow(r.k),empty:'해당 항목이 없습니다.',cols});
+    host.append(p);
+  }
+  const long=by('장기 미발주');
+  if(long.length){host.append(K.section(`장기 미발주 ${long.length}${cw} · 평소 주기의 3배 이상 주문 없음`,sel==='장기 미발주',b=>table(b,{id:'act-long-'+key,rows:long,maxH:480,sort:{k:'r12',d:-1},onRow:r=>onRow(r.k),cols})))}
+  host.append(el('div',{class:'foot',text:'※ 평소 주기 = 최근 1년간 주문일 사이 평균 간격. 주기 초과 = 마지막 주문 후 평소 주기의 1.5배(최소 +10일)를 넘긴 경우. 표의 행을 클릭하면 상세 정보가 열립니다.'}));
 };
 // 전년 대비 잃은 매출 (올해 누계 vs 전년 같은 날짜까지, 작년 연간 기준 이상)
 K.lost=function(host,rows,{key,name,sub,onRow,minAmt=12e6,unitLab='거래처',firstOf}){
