@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXCLUDE_CUST = {'개인소매', '맥널티 인터내셔널'}
+EXCLUDE_CUST = {'개인소매', '맥널티 인터내셔널', '카페쇼'}
 # 같은 거래처로 묶기 (대표거래처 이름 변경 등)
 CUST_ALIAS = {'에스케이하이닉스': 'SK하이닉스(행복나래)', '행복나래': 'SK하이닉스(행복나래)'}
 # 유형세부 묶기
