@@ -13,7 +13,11 @@ from datetime import datetime, timezone, timedelta
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXCLUDE_CUST = {'개인소매'}
+EXCLUDE_CUST = {'개인소매', '맥널티 인터내셔널'}
+# 같은 거래처로 묶기 (대표거래처 이름 변경 등)
+CUST_ALIAS = {'에스케이하이닉스': 'SK하이닉스(행복나래)', '행복나래': 'SK하이닉스(행복나래)'}
+# 유형세부 묶기
+TYPE_ALIAS = {'군복지단': '공공기관', '교정기관': '공공기관'}
 ATOMY_CUST = {'애터미', '애터미_수출'}
 # 현 재직 담당자. 여기 없는 이름은 화면에서 '퇴사자'(실적)·'미배정'(현재 담당 거래처)으로 묶인다.
 STAFF = ['박성철', '문건수', '김준호', '윤남녕', '강승원']
@@ -155,8 +159,10 @@ def main():
     artifact_dir = sys.argv[1] if len(sys.argv) > 1 else None
     r = load_all()
     n0 = len(r)
-    r = r[~r['대표거래처'].isin(EXCLUDE_CUST)]
-    print(f'개인소매 제외: {n0 - len(r)}행')
+    r = r[~r['대표거래처'].isin(EXCLUDE_CUST)].copy()
+    print(f'제외 거래처 {sorted(EXCLUDE_CUST)}: {n0 - len(r)}행')
+    r['대표거래처'] = r['대표거래처'].replace(CUST_ALIAS)
+    r['유형세부'] = r['유형세부'].replace(TYPE_ALIAS)
     is_at = r['대표거래처'].isin(ATOMY_CUST)
     built = datetime.now(KST).strftime('%Y-%m-%d %H:%M')
     base = r['date'].max()
