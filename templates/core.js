@@ -265,6 +265,7 @@ K.sig=function(rows,win=3){
 };
 const TAGC={'이탈 위험':'st-risk','급감':'st-risk','주문 지연':'st-late','발주 예정':'st-new','주기 초과':'st-late','장기 미발주':'st-dorm','성장':'st-ok'};
 K.tag=t=>el('span',{class:'pill '+(TAGC[t]||''),text:t});
+const TAGD={'급감':w=>`최근 ${w}개월 매출이 전년 같은 기간보다 30% 이상 감소`,'이탈 위험':w=>`최근 ${w}개월 매출 없음 (전년 같은 기간엔 거래)`,'주문 지연':()=>'평균 주문 간격의 1.5배 넘게 주문 없음','성장':w=>`최근 ${w}개월 매출이 전년 같은 기간보다 20% 이상 증가`};
 // 상위 10곳 집중 관리: 최근 12개월 매출 상위 10. 금월·금년 누계를 전년 같은 날짜까지와 비교
 K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',win=3}){
   const g=groupBy(rows.filter(r=>r.d>=D12),key);
@@ -273,7 +274,10 @@ K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',win=3})
     const ytd=sum(inR(all,yf,MAX)),lytd=lyf>=MIN?sum(inR(all,lyf,lt)):null;
     return{k:o.k,name:name(o.k),sub:sub?sub(o.k):'',r12:o.a,mtd:sum(inR(all,mf,MAX)),lmtd:lmf>=MIN?sum(inR(all,lmf,lt)):null,lmfull:lmf>=MIN?sum(inR(all,lmf,lme)):null,
       ytd,lytd,gr:lytd?(ytd-lytd)/Math.abs(lytd):null,s:K.sig(all,win)}});
-  const p=K.panel(title,`최근 12개월 매출 상위 10${unitLab==='거래처'?'곳':'개'} · 전년 수치는 같은 날짜까지 · 신호: 빨강 최근 ${win}개월 전년 대비 −30% 이하, 주황 주문 지연, 초록 +20% 이상`);
+  const p=K.panel(title,`최근 12개월 매출 상위 10${unitLab==='거래처'?'곳':'개'} · 전년 수치는 전년 같은 날짜까지`);
+  p.append(el('div',{class:'siglegend'},
+    el('div',{class:'lr'},el('b',{text:'성장률'}),el('span',{text:`금년 누계(1/1~${BM}/${BD})가 전년 같은 기간 누계보다 몇 % 늘었는지(▲) 줄었는지(▼)`})),
+    el('div',{class:'lr'},el('b',{text:'신호'}),el('span',{class:'lgi'},...['급감','이탈 위험','주문 지연','성장'].map(t=>el('span',{class:'li'},K.tag(t),el('span',{text:TAGD[t](win)}))))) ));
   const d=el('div');p.append(d);
   table(d,{id:'top10-'+key,rows:top,maxH:560,sort:{k:'r12',d:-1},onRow:r=>onRow(r.k),
     cols:[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:unitLab,cls:'name',title:r=>r.name},...(sub?[{k:'sub',l:'담당'}]:[]),
@@ -281,8 +285,8 @@ K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',win=3})
       {k:'lmtd',l:'전년 동월',n:1,f:r=>r.lmtd==null?'—':amt(r.lmtd),title:r=>r.lmfull==null?null:`전년 ${BM}/1~${BM}/${BD} ${won(r.lmtd)} · 전년 ${BM}월 전체 ${won(r.lmfull)}`},
       {k:'ytd',l:'금년 누계',n:1,f:r=>amt(r.ytd),title:r=>won(r.ytd)},
       {k:'lytd',l:'전년 누계',n:1,f:r=>r.lytd==null?'—':amt(r.lytd),title:r=>r.lytd==null?null:won(r.lytd)},
-      {k:'gr',l:'성장률',n:1,tip:'금년 누계 vs 전년 누계 (같은 날짜까지)',f:r=>dCell(r.ytd,r.lytd)},
-      {k:'tg',l:'신호',f:r=>r.s.tags.length?el('span',{class:'tags'},...r.s.tags.map(K.tag)):el('span',{class:'flat',text:'—'}),nosort:1}]});
+      {k:'gr',l:'성장률 (누계)',n:1,tip:'금년 누계 vs 전년 누계 (같은 날짜까지)',f:r=>dCell(r.ytd,r.lytd)},
+      {k:'tg',l:'신호',f:r=>r.s.tags.length?el('span',{class:'tags'},...r.s.tags.map(t=>{const x=K.tag(t);x.title=TAGD[t]?TAGD[t](win):'';return x})):el('span',{class:'flat',text:'—'}),nosort:1}]});
   host.append(p);
 };
 // 영업 액션: 발주 주기 기준 (최근 1년 3회 이상 주문)
