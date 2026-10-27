@@ -218,3 +218,14 @@ details.panel .tw{margin:0;border-top:0}
 .selpanel{border-color:var(--accent)}
 .pwrap{display:flex;flex-direction:column;gap:16px}
 .loss{color:var(--bad);font-weight:600}
+.flow{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;padding:12px 16px 0}
+.flow .fstep{background:var(--panel2);border-radius:8px;padding:6px 10px;min-width:92px}
+.flow .fstep small{display:block;color:var(--muted);font-size:11.5px}
+.flow .fstep b{font-size:15px;font-variant-numeric:tabular-nums}
+.flow .fstep.minus b{color:var(--muted)}
+.flow .fstep.neg{background:color-mix(in srgb,var(--bad) 12%,var(--panel))}
+.flow .arr{align-self:center;color:var(--faint);font-weight:700}
+.tips{margin:12px 16px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.tips ul{margin:6px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.tips .tk{display:inline-block;min-width:36px;margin-right:8px;font-size:11.5px;font-weight:600;color:var(--accent)}
+.legend-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:-8px}
