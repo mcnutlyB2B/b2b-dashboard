@@ -38,7 +38,10 @@ def file_time(path):
 def read_file(path):
     raw = pd.read_excel(path, header=None, dtype=str)
     # 머리글 행 찾기 ('수출구분'이 있는 행)
-    hdr = next(i for i in range(min(10, len(raw))) if '수출구분' in raw.iloc[i].astype(str).str.replace(' ', '').tolist())
+    hdr = next((i for i in range(min(10, len(raw))) if '수출구분' in raw.iloc[i].astype(str).str.replace(' ', '').tolist()), None)
+    if hdr is None:  # 판매실적 파일이 아님 (예: 수익성분석 파일) → 건너뜀
+        print(f'  {os.path.basename(path)}: 판매실적 형식이 아니라 건너뜀')
+        return None
     d = pd.read_excel(path, header=hdr, dtype={'품번': str, '실적구분번호': str})
     d.columns = [str(c).replace(' ', '') for c in d.columns]
     tot = d[d['수출구분'] == 'TOTAL']
@@ -65,7 +68,7 @@ def load_all():
         if os.path.basename(p).startswith('~$'):
             continue
         r = read_file(p)
-        if not len(r):
+        if r is None or not len(r):
             continue
         lo, hi = r['date'].min(), r['date'].max()
         if merged is None:
@@ -176,6 +179,8 @@ def main():
         data, s, q = pack(part, page == 'atomy')
         sums += s
         data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF)
+        pf = os.path.join(ROOT, 'data', 'profit.enc.json')  # 수익성 (암호화, scripts/profit_pack.py로 생성)
+        data['penc'] = json.load(open(pf, encoding='utf-8')).get(page) if os.path.exists(pf) else None
         print(f'{page}: {len(data["rows"])}행, 매출 {s:,.0f}, 수량 {q:,.2f}')
         render(page, data, os.path.join(ROOT, page, 'index.html'))
         if artifact_dir:
