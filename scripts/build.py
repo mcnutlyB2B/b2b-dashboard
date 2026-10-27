@@ -179,7 +179,8 @@ def main():
         data, s, q = pack(part, page == 'atomy')
         sums += s
         data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF)
-        pf = os.path.join(ROOT, 'data', 'profit.enc.json')  # 수익성 (암호화, scripts/profit_pack.py로 생성)
+        pfs = glob.glob(os.path.join(ROOT, 'data', 'profit.enc*.json'))  # 수익성 (암호화). 이름이 _1 등으로 바뀌어 올라와도 가장 나중에 올린 파일 사용
+        pf = max(pfs, key=file_time) if pfs else ''
         data['penc'] = json.load(open(pf, encoding='utf-8')).get(page) if os.path.exists(pf) else None
         print(f'{page}: {len(data["rows"])}행, 매출 {s:,.0f}, 수량 {q:,.2f}')
         render(page, data, os.path.join(ROOT, page, 'index.html'))
