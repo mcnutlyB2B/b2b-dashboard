@@ -105,7 +105,13 @@ function render(keep){
 }
 K.render=render;
 K.reset=()=>{const tab=S.tab;Object.assign(S,JSON.parse(JSON.stringify(K.S0)),{tab,q:{}});document.getElementById('overlay').innerHTML='';render();window.scrollTo(0,0)};
-K.start=page=>{K.page=page;K.S0=JSON.parse(JSON.stringify(S));const h=location.hash.slice(1);S.tab=page.tabs.some(t=>t[0]===h)?h:page.tabs[0][0];render();
+K.selItem=(rows,name,onClose,onFull)=>{const p=el('section',{class:'panel selpanel'});
+  const yr=rows.filter(r=>r.y===BY),pos=yr.filter(r=>r.a>0&&r.q>0),q=sum(pos,'q'),last=rows.filter(r=>r.a>0).reduce((m,r)=>r.d>m?r.d:m,'');
+  p.append(el('h2',{},'선택 품목 월별 매출',el('span',{class:'sub',text:name}),el('span',{class:'right'},onFull?el('button',{class:'chip',text:'품목 전체 보기',onclick:onFull}):null,el('button',{class:'chip',text:'닫기 ✕',onclick:onClose}))));
+  p.append(el('div',{class:'pb'},K.stats([[`${BY}년 누계`,amt(sum(yr))],[`${BY-1}년 전체`,amt(sum(rows.filter(r=>r.y===BY-1)))],['최종 주문일',last?last.slice(2).replace(/-/g,'.'):'—'],[`${BY}년 수량`,nf(sum(yr,'q'))],['평균 단가',q?nf(sum(pos)/q)+'원':'—'],['주문 횟수(금년)',new Set(yr.filter(r=>r.a>0).map(r=>r.d)).size+'회']])));
+  p.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});p.append(mc);K.monthly2(mc,rows);
+  setTimeout(()=>p.scrollIntoView({block:'start',behavior:'smooth'}),60);return p};
+K.start=page=>{K.page=page;K.autoUnlock();K.S0=JSON.parse(JSON.stringify(S));const h=location.hash.slice(1);S.tab=page.tabs.some(t=>t[0]===h)?h:page.tabs[0][0];render();
   let lw=window.innerWidth,tm;window.addEventListener('resize',()=>{if(window.innerWidth===lw)return;lw=window.innerWidth;clearTimeout(tm);tm=setTimeout(()=>render(true),200)})};
 
 // ── 막대그래프: 금년(진한 막대) 앞, 비교(연한 넓은 막대) 뒤. 막대 위 값.
@@ -344,6 +350,67 @@ K.lost=function(host,rows,{key,name,sub,onRow,minAmt=12e6,unitLab='거래처',fi
 };
 K.topItems=(rows,nameOf,n=3)=>{const g=groupBy(rows.filter(r=>r.d>=D12),'i');return [...g.values()].sort((a,b)=>b.a-a.a).slice(0,n).map(o=>nameOf(o.k)).join(', ')};
 
+// ── 수익성 (ERP 수익성분석지수, 비밀번호로 암호화된 데이터)
+const PC=['qty','real','sales','cogs','gp','sga','op'];
+K.P=null;
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+K.unlock=async pw=>{const e=D.penc;if(!e)return false;
+  try{const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(e.salt),iterations:e.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.ct));
+    K.P=JSON.parse(new TextDecoder().decode(pt));try{sessionStorage.setItem('pp',pw)}catch(x){}return true}catch(x){return false}};
+K.autoUnlock=async()=>{if(K.P||!D.penc)return;let pw=null;try{pw=sessionStorage.getItem('pp')}catch(x){}if(pw)await K.unlock(pw)};
+const pRow=(arr,off)=>{const o={};PC.forEach((k,j)=>o[k]=arr[off+j]);o.gpr=o.sales>0?o.gp/o.sales:null;o.opr=o.sales>0?o.op/o.sales:null;return o};
+K.profitMonths=()=>K.P?Object.keys(K.P.months).sort():[];
+K.profitCust=ym=>((K.P?.months[ym]||{}).cust||[]).map(r=>Object.assign({name:r[0]},pRow(r,1)));
+K.profitItem=ym=>((K.P?.months[ym]||{}).item||[]).map(r=>Object.assign({code:r[0],name:r[1],spec:r[2]},pRow(r,3)));
+const pct=v=>v==null?'—':(v*100).toFixed(1)+'%';
+const opCell=v=>el('span',{class:v<0?'loss':'',text:amt(v)});
+const gprCell=v=>el('span',{class:v!=null&&v<0?'loss':v!=null&&v<0.1?'st-late':'',text:pct(v)});
+K.profitLine=(name)=>{const ms=K.profitMonths();if(!ms.length)return null;const ym=ms[ms.length-1];const r=K.profitCust(ym).find(x=>x.name===name);if(!r)return null;
+  return el('div',{class:'callout pline'},el('b',{text:`${+ym.slice(5)}월 손익 `}),`매출 ${amt(r.sales)} · 매출총이익 ${amt(r.gp)} (${pct(r.gpr)}) · 영업이익 `,opCell(r.op),` (${pct(r.opr)})`)};
+// 탭 화면
+K.profitTab=async function(M,{custFilter,custInfo,onCust,itemId,onItem,custLab='거래처'}){
+  const W=el('div',{class:'pwrap'});M.append(W);M=W;
+  await K.autoUnlock();
+  if(!D.penc){M.append(el('div',{class:'empty',text:'수익성 자료가 아직 없습니다.'}));return}
+  if(!K.P){const box=el('section',{class:'panel lock'});const inp=el('input',{id:'ppw',type:'password',placeholder:'비밀번호',autocomplete:'off'});const msg=el('div',{class:'note'});
+    const go=async()=>{msg.textContent='확인 중…';if(await K.unlock(inp.value))K.render(true);else msg.textContent='비밀번호가 맞지 않습니다.'};
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    box.append(el('h2',{},'수익성 분석',el('span',{class:'sub',text:'원가·이익 정보가 있어 비밀번호가 필요합니다'})),el('div',{class:'pb lockrow'},inp,el('button',{class:'btn pri',text:'확인',onclick:go}),msg));
+    M.append(box);setTimeout(()=>inp.focus(),50);return}
+  const ms=K.profitMonths();if(!S.pm||!ms.includes(S.pm))S.pm=ms[ms.length-1];const ym=S.pm;
+  const row=el('div',{class:'row'},el('span',{class:'lab',text:'월'}),...ms.map(m=>el('button',{class:'chip'+(m===ym?' on':''),text:`${m.slice(0,4)}년 ${+m.slice(5)}월`,onclick:()=>{S.pm=m;K.render(true)}})));
+  M.append(row);
+  let cs=K.profitCust(ym).filter(r=>custFilter(r.name));const its=K.profitItem(ym);
+  const T=k=>cs.reduce((s,r)=>s+r[k],0);const tot={sales:T('sales'),cogs:T('cogs'),gp:T('gp'),sga:T('sga'),op:T('op')};
+  const negC=cs.filter(r=>r.op<0),negI=its.filter(r=>r.op<0),lowI=its.filter(r=>r.sales>0&&r.gpr<0.1);
+  const g=el('div',{class:'grid5'});
+  const card=(k,v,d,cls)=>el('div',{class:'card static'},el('div',{class:'k',text:k}),el('div',{class:'v '+(cls||''),text:v}),el('div',{class:'d'},el('span',{class:'flat',text:d||''})));
+  g.append(card('매출액',amt(tot.sales),`${custLab} ${cs.filter(r=>r.sales).length}곳`),card('매출원가',amt(tot.cogs),`원가율 ${pct(tot.sales?tot.cogs/tot.sales:null)}`),
+    card('매출총이익',amt(tot.gp),`총이익률 ${pct(tot.sales?tot.gp/tot.sales:null)}`),card('판매비와관리비',amt(tot.sga),`매출 대비 ${pct(tot.sales?tot.sga/tot.sales:null)}`),
+    card('영업이익',amt(tot.op),`영업이익률 ${pct(tot.sales?tot.op/tot.sales:null)} · 적자 ${custLab} ${negC.length}곳`,tot.op<0?'down':''));
+  M.append(g);
+  // 거래처별
+  const cp=K.panel(`${custLab}별 손익`,`${+ym.slice(5)}월 · ${custLab} ${cs.length}곳 · 영업적자 ${negC.length}곳 ${amt(negC.reduce((s,r)=>s+r.op,0))}`);
+  const cf=S.pcf||'neg';const cc=el('div',{class:'tools'},...[['neg',`영업적자 ${negC.length}`],['all',`전체 ${cs.length}`]].map(([k,l])=>el('button',{class:'chip'+(cf===k?' on':''),text:l,onclick:()=>{S.pcf=k;K.render(true)}})));
+  cp.append(cc);const cd=el('div');cp.append(cd);
+  const crow=cs.map(r=>Object.assign({},r,custInfo(r.name)));
+  table(cd,{id:'pcust',rows:cf==='neg'?crow.filter(r=>r.op<0):crow,maxH:480,sort:{k:'op',d:1},onRow:r=>r.id!=null&&onCust(r.id),empty:'영업적자 거래처가 없습니다.',
+    cols:[{k:'name',l:custLab,cls:'name',title:r=>r.name},...(crow.some(r=>r.rep)?[{k:'rep',l:'담당'}]:[]),{k:'sales',l:'매출액',n:1,f:r=>amt(r.sales),title:r=>won(r.sales)},{k:'cogs',l:'매출원가',n:1,f:r=>amt(r.cogs)},
+      {k:'gp',l:'매출총이익',n:1,f:r=>amt(r.gp)},{k:'gpr',l:'총이익률',n:1,f:r=>gprCell(r.gpr)},{k:'sga',l:'판관비',n:1,f:r=>amt(r.sga)},{k:'op',l:'영업이익',n:1,f:r=>opCell(r.op),title:r=>won(r.op)},{k:'opr',l:'영업이익률',n:1,f:r=>pct(r.opr)},
+      {k:'nt',l:'비고',f:r=>r.sales===0&&r.sga?el('span',{class:'flat',text:'매출 없이 판관비만 배분'}):'',nosort:1}]});
+  M.append(cp);
+  // 품목별
+  const ip=K.panel('품목별 손익',`${+ym.slice(5)}월 · 품목 ${its.length}개 · 영업적자 ${negI.length}개 · 총이익률 10% 미만 ${lowI.length}개`);
+  const ifl=S.pif||'neg';ip.append(el('div',{class:'tools'},...[['neg',`영업적자 ${negI.length}`],['low',`총이익률 10% 미만 ${lowI.length}`],['all',`전체 ${its.length}`]].map(([k,l])=>el('button',{class:'chip'+(ifl===k?' on':''),text:l,onclick:()=>{S.pif=k;K.render(true)}}))));
+  const idv=el('div');ip.append(idv);
+  table(idv,{id:'pitem',rows:ifl==='neg'?negI:ifl==='low'?lowI:its,maxH:520,sort:ifl==='low'?{k:'gpr',d:1}:{k:'op',d:1},onRow:r=>{const id=itemId(r.code);if(id!=null)onItem(id)},empty:'해당 품목이 없습니다.',
+    cols:[{k:'name',l:'품명',cls:'name',title:r=>`${r.name} · ${r.code}`},{k:'spec',l:'규격'},{k:'qty',l:'수량',n:1,f:r=>nf(r.qty)},{k:'sales',l:'매출액',n:1,f:r=>amt(r.sales),title:r=>won(r.sales)},
+      {k:'cogs',l:'매출원가',n:1,f:r=>amt(r.cogs)},{k:'gp',l:'매출총이익',n:1,f:r=>amt(r.gp)},{k:'gpr',l:'총이익률',n:1,f:r=>gprCell(r.gpr)},{k:'sga',l:'판관비',n:1,f:r=>amt(r.sga)},{k:'op',l:'영업이익',n:1,f:r=>opCell(r.op),title:r=>won(r.op)},{k:'opr',l:'영업이익률',n:1,f:r=>pct(r.opr)}]});
+  M.append(ip);
+  M.append(el('div',{class:'foot',text:'※ ERP 수익성분석지수 기준(월별). 매출액은 ERP \'1.매출액\', 판관비는 ERP 배분 기준입니다. 품목별 손익은 제외 거래처(개인소매 등) 매출이 포함된 ERP 품목 합계입니다. 거래처·품목을 클릭하면 상세 정보가 열립니다.'}));
+};
 // ── 서랍
 K.drawer=function(title,sub,build){
   const ov=document.getElementById('overlay');ov.innerHTML='';
