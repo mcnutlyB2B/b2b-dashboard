@@ -221,9 +221,10 @@ function common(dr,all,id,kindRows){
   const mp=panel('월별 매출',`${BY}년 vs ${BY-1}년`);mp.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});mp.append(mc);dr.append(mp);K.monthly2(mc,all);
   return{cur,prev};
 }
-function custDrawer(id){const all=R.filter(r=>r.c===id);
-  K.drawer(D.custs[id],`${D.types[D.custType[id]]} · 현재 담당 ${K.curRep(id)}`,dr=>{const{cur,prev}=common(dr,all,id);
-    const x=brk(cur,prev,'i','품목',k=>D.items[k][1],r=>itemDrawer(r.id));dr.append(K.section(`품목별 (${perName(S.f,S.t)})`,true,b=>table(b,{id:'dci',...x,maxH:320,sort:{k:'a',d:-1},redraw:()=>custDrawer(id)})));
+function custDrawer(id,sel){const all=R.filter(r=>r.c===id);
+  K.drawer(D.custs[id],`${D.types[D.custType[id]]} · 현재 담당 ${K.curRep(id)}`,dr=>{const{cur,prev}=common(dr,all,id);const pl=K.profitLine(D.custs[id]);if(pl)dr.append(pl);
+    const x=brk(cur,prev,'i','품목',k=>D.items[k][1],r=>custDrawer(id,sel===r.id?null:r.id));dr.append(K.section(`품목별 (${perName(S.f,S.t)}) · ※ 품목을 클릭하면 이 거래처의 월별 매출이 보입니다`,true,b=>table(b,{id:'dci',...x,maxH:320,sort:{k:'a',d:-1},rowCls:r=>r.id===sel?'on':'',redraw:()=>custDrawer(id,sel)})));
+    if(sel!=null)dr.append(K.selItem(all.filter(r=>r.i===sel),`${D.custs[id]} · ${D.items[sel][1]}`,()=>custDrawer(id),()=>itemDrawer(sel)));
     const sx=brk(cur,prev,'s','사업장',k=>D.subs[k]);if(sx.rows.length>1)dr.append(K.section('사업장별',false,b=>table(b,{id:'dcs',...sx,maxH:320,sort:{k:'a',d:-1},redraw:()=>custDrawer(id)})));
     const docs=docList(all.filter(r=>r.d>=addD(MAX,-364)),r=>D.subs[r.s]);
     dr.append(K.section(`최근 1년 출고 전표 ${docs.length}건`,false,b=>table(b,{id:'dcd',rows:docs,maxH:340,sort:{k:'d',d:-1},redraw:()=>custDrawer(id),cols:[{k:'d',l:'일자',f:r=>r.d.slice(2).replace(/-/g,'.')},{k:'name',l:'사업장',cls:'name',title:r=>r.name},{k:'items',l:'품목',cls:'name',title:r=>r.items},{k:'a',l:'금액',n:1,f:r=>amt(r.a),title:r=>won(r.a)}]})));
@@ -238,6 +239,11 @@ function repDrawer(p){const key=S.basis==='cur'?'cp':'p';const all=F(R,{noRep:tr
     const tx=brk(cur,prev,'t','유형',k=>k);dr.append(K.section('유형별',false,b=>table(b,{id:'drt',...tx,maxH:320,sort:{k:'a',d:-1},redraw:()=>repDrawer(p)})));
   })}
 
-K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감']],controls,
-  draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCust,rep:tabRep,item:tabItem,ret:tabRet})[tab](M)});
+// ══ 수익성 (비밀번호)
+const CIDX=Object.fromEntries(D.custs.map((c,i)=>[c,i])),IIDX=Object.fromEntries(D.items.map((it,i)=>[it[0],i]));
+function tabProfit(M){K.profitTab(M,{custFilter:n=>{const id=CIDX[n];if(id==null)return !S.rep&&!S.type;return (!S.rep||K.curRep(id)===S.rep)&&(!S.type||D.types[D.custType[id]]===S.type)},
+  custInfo:n=>{const id=CIDX[n];return id==null?{id:null,rep:''}:{id,rep:K.curRep(id)}},onCust:id=>custDrawer(id),itemId:c=>IIDX[c],onItem:id=>itemDrawer(id)})}
+
+K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감'],['profit','수익성 🔒']],controls,
+  draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCust,rep:tabRep,item:tabItem,ret:tabRet,profit:tabProfit})[tab](M)});
 })();
