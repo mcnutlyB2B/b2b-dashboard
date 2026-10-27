@@ -163,7 +163,10 @@ def main():
     print(f'제외 거래처 {sorted(EXCLUDE_CUST)}: {n0 - len(r)}행')
     r['대표거래처'] = r['대표거래처'].replace(CUST_ALIAS)
     r['유형세부'] = r['유형세부'].replace(TYPE_ALIAS)
-    is_at = r['대표거래처'].isin(ATOMY_CUST)
+    # ERP 대표거래처가 '애터미(대표)' 등으로 바뀌어도 거래처(애터미/애터미_수출) 기준으로 맞춤
+    sub_at = r['거래처'].isin(ATOMY_CUST)
+    r.loc[sub_at, '대표거래처'] = r.loc[sub_at, '거래처']
+    is_at = r['대표거래처'].isin(ATOMY_CUST) | (r['유형세부'] == 'Atomy')
     built = datetime.now(KST).strftime('%Y-%m-%d %H:%M')
     base = r['date'].max()
     dmin = r['date'].min()
