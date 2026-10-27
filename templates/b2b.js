@@ -242,8 +242,9 @@ function repDrawer(p){const key=S.basis==='cur'?'cp':'p';const all=F(R,{noRep:tr
 // ══ 수익성 (비밀번호)
 const CIDX=Object.fromEntries(D.custs.map((c,i)=>[c,i])),IIDX=Object.fromEntries(D.items.map((it,i)=>[it[0],i]));
 function tabProfit(M){K.profitTab(M,{custFilter:n=>{const id=CIDX[n];if(id==null)return !S.rep&&!S.type;return (!S.rep||K.curRep(id)===S.rep)&&(!S.type||D.types[D.custType[id]]===S.type)},
-  custInfo:n=>{const id=CIDX[n];return id==null?{id:null,rep:''}:{id,rep:K.curRep(id)}},onCust:id=>custDrawer(id),itemId:c=>IIDX[c],onItem:id=>itemDrawer(id)})}
+  custInfo:n=>{const id=CIDX[n];return id==null?{id:null,rep:''}:{id,rep:K.curRep(id)}},onCust:id=>custDrawer(id),itemId:c=>IIDX[c],onItem:id=>itemDrawer(id),
+  docCount:(n,ms)=>{const id=CIDX[n];if(id==null)return null;const rs=R.filter(r=>r.c===id&&r.a>0&&ms.includes(r.ym));const dm=groupBy(rs,'doc');return dm.size?{n:dm.size,avg:sum(rs)/dm.size}:null}})}
 
-K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감'],['profit','수익성 🔒']],controls,
+K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감'],['profit','손익 분석 🔒']],controls,
   draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCust,rep:tabRep,item:tabItem,ret:tabRet,profit:tabProfit})[tab](M)});
 })();
