@@ -207,8 +207,8 @@ function docDrawer(doc){
 
 // ══ 수익성 (비밀번호)
 const IIDX=Object.fromEntries(D.items.map((it,i)=>[it[0],i]));
-function tabProfit(M){K.profitTab(M,{custFilter:n=>S.cust===''||D.custs[+S.cust]===n,custInfo:n=>({id:null}),onCust:()=>{},itemId:c=>IIDX[c],onItem:id=>itemDrawer(id)})}
+function tabProfit(M){K.profitTab(M,{custFilter:n=>S.cust===''||D.custs[+S.cust]===n,custInfo:n=>({id:null}),onCust:null,itemId:c=>IIDX[c],onItem:id=>itemDrawer(id)})}
 
-K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['item','시장·품목'],['order','주문 내역'],['profit','수익성 🔒']],controls,
+K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['item','시장·품목'],['order','주문 내역'],['profit','손익 분석 🔒']],controls,
   draw:(tab,M)=>({sales:tabSales,action:tabAction,item:tabItem,order:tabOrder,profit:tabProfit})[tab](M)});
 })();
