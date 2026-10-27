@@ -212,3 +212,9 @@ details.panel .tw{margin:0;border-top:0}
 .siglegend .lr b{color:var(--fg);font-weight:600}
 .siglegend .lgi{display:flex;flex-wrap:wrap;gap:6px 16px}
 .siglegend .li{display:inline-flex;align-items:center;gap:6px}
+.lock .lockrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lock input{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 10px;color:var(--fg);font:inherit;width:200px;max-width:100%}
+.pline{font-size:13px}
+.selpanel{border-color:var(--accent)}
+.pwrap{display:flex;flex-direction:column;gap:16px}
+.loss{color:var(--bad);font-weight:600}
