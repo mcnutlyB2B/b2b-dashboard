@@ -141,10 +141,20 @@ def pack(r, atomy):
                 subs=subs, reps=reps, exps=exps, docs=docs, items=item_rows, rows=rows), r['원화판매금액'].sum(), r['수량'].sum()
 
 
+def gate_js():
+    return open(os.path.join(ROOT, 'templates', 'gate.js'), encoding='utf-8').read()
+
+
+def profit_enc():
+    """data/profit.enc*.json 중 가장 나중에 올린 파일 (암호화된 손익 + 비밀번호 확인용 chk)."""
+    pfs = glob.glob(os.path.join(ROOT, 'data', 'profit.enc*.json'))
+    return json.load(open(max(pfs, key=file_time), encoding='utf-8')) if pfs else {}
+
+
 def render(page, data, out_path, artifact=False):
     t = open(os.path.join(ROOT, 'templates', 'shell.html'), encoding='utf-8').read()
     css = open(os.path.join(ROOT, 'templates', 'core.css'), encoding='utf-8').read()
-    core = open(os.path.join(ROOT, 'templates', 'core.js'), encoding='utf-8').read()
+    core = gate_js() + open(os.path.join(ROOT, 'templates', 'core.js'), encoding='utf-8').read()
     pj = open(os.path.join(ROOT, 'templates', f'{page}.js'), encoding='utf-8').read()
     title = {'atomy': '애터미 매출 대시보드', 'b2b': 'B2B 채널 매출 대시보드'}[page]
     js = json.dumps(data, ensure_ascii=False, separators=(',', ':'), allow_nan=False).replace('</', '<\\/')
@@ -179,15 +189,18 @@ def main():
         data, s, q = pack(part, page == 'atomy')
         sums += s
         data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF)
-        pfs = glob.glob(os.path.join(ROOT, 'data', 'profit.enc*.json'))  # 수익성 (암호화). 이름이 _1 등으로 바뀌어 올라와도 가장 나중에 올린 파일 사용
-        pf = max(pfs, key=file_time) if pfs else ''
-        data['penc'] = json.load(open(pf, encoding='utf-8')).get(page) if os.path.exists(pf) else None
+        pe = profit_enc()
+        data['penc'] = pe.get(page)
+        data['chk'] = pe.get('chk')
         print(f'{page}: {len(data["rows"])}행, 매출 {s:,.0f}, 수량 {q:,.2f}')
         render(page, data, os.path.join(ROOT, page, 'index.html'))
         if artifact_dir:
             render(page, data, os.path.join(artifact_dir, f'{page}-dashboard.html'), artifact=True)
     print(f'검증: 애터미+B2B {sums:,.0f} = 전체 {total:,.0f} → {"OK" if abs(sums-total) < 1 else "불일치!"}')
-    open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(open(os.path.join(ROOT, 'templates', 'home.html'), encoding='utf-8').read().replace('__BASE__', base).replace('__BUILT__', built))
+    chk = json.dumps(profit_enc().get('chk'))
+    home = open(os.path.join(ROOT, 'templates', 'home.html'), encoding='utf-8').read()
+    home = home.replace('__BASE__', base).replace('__BUILT__', built).replace('__GATE__', gate_js()).replace('__CHK__', chk)
+    open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(home)
 
 
 if __name__ == '__main__':
