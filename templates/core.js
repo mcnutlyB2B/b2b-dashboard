@@ -89,6 +89,7 @@ function drawTop(){
   const meta=document.getElementById('meta');meta.innerHTML='';
   meta.append('매출 기준일 ',el('b',{text:MAX.replace(/-/g,'.')}),' · 선택 ',el('b',{text:perName(S.f,S.t)}),
     y?` · 비교 전년 동기 (${perName(y.f,y.t)})`:' · 전년 자료 없음');
+  (D.meta.tx||[]).forEach(t=>meta.append(' ',el('span',{class:'pill st-late',title:'매출 마감 전이라 이 달은 출고 실적(거래명세서)으로 집계합니다. 매출 마감 후 매출 기준으로 바뀝니다.',text:`${+t.m.slice(5)}월: 실적구분 '거래명세서' 기준 (마감 전)`})));
   const tr=document.querySelector('.titlerow');let tb=document.getElementById('tbtns');
   if(!tb){tb=el('div',{id:'tbtns',class:'tbtns'},el('a',{class:'tbtn',href:'../',text:'⌂ 메인'}),el('button',{class:'tbtn',text:'↺ 선택 초기화',title:'기간·필터·정렬을 처음 상태로 되돌립니다',onclick:()=>K.reset()}));tr.append(tb)}
   const ctl=document.getElementById('ctl');ctl.innerHTML='';ctl.append(periodRow());
@@ -100,7 +101,7 @@ const M=document.getElementById('main');
 function render(keep){
   const y=window.scrollY;drawTop();M.innerHTML='';
   K.page.draw(S.tab,M);
-  M.append(el('div',{class:'foot',text:`매출 = 원화판매금액(부가세 제외, 반품·차감 포함). 자료: ERP 일일판매실적조회 (기업영업팀) ${MIN.replace(/-/g,'.')}~${MAX.replace(/-/g,'.')}. 개인소매 제외. 갱신 ${D.meta.built}`}));
+  M.append(el('div',{class:'foot',text:`매출 = 원화판매금액(부가세 제외, 반품·차감 포함). 자료: ERP 일일판매실적조회 (기업영업팀) ${MIN.replace(/-/g,'.')}~${MAX.replace(/-/g,'.')}. 개인소매 제외.${(D.meta.tx||[]).map(t=>` ${+t.m.slice(5)}월은 매출 마감 전이라 실적구분 '거래명세서'(출고) 기준.`).join('')} 갱신 ${D.meta.built}`}));
   if(keep)window.scrollTo(0,y);
 }
 K.render=render;
@@ -196,7 +197,7 @@ K.progress=function(host,rows,{note,donut}={}){
   const body=el('div',{class:'prog'});pan.append(body);
   const nums=el('div',{class:'nums'});
   const dx=delta(cur,ly);
-  nums.append(el('div',{class:'hero'},el('small',{text:`${perName(S.f,S.t)} 매출`}),el('b',{text:amt(cur),title:won(cur)})),
+  nums.append(el('div',{class:'hero'},el('small',{text:`${perName(S.f,S.t)} 매출`+((D.meta.tx||[]).some(t=>t.m>=S.f.slice(0,7)&&t.m<=S.t.slice(0,7))?' (거래명세서 포함)':'')}),el('b',{text:amt(cur),title:won(cur)})),
     el('div',{class:'hero'},el('small',{text:y?`전년 동기 (${perName(y.f,y.t)})`:'전년 동기'}),el('b',{class:'ly',text:y?amt(ly):'자료 없음',title:y?won(ly):null}),' ',el('span',{class:'dx '+dx.c,text:y?dx.t:''})));
   const pr=ref>0?cur/ref:null;
   if(pr!=null){const sc=Math.max(1,pr);const bar=el('div',{class:'pbar',title:`${refLab} 대비 ${(pr*100).toFixed(1)}%`},el('i',{style:`width:${pr/sc*100}%`}),el('em',{text:`${refLab} ${amt(ref)} = 100%`}));
