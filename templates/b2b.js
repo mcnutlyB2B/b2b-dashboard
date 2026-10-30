@@ -245,6 +245,6 @@ function tabProfit(M){K.profitTab(M,{custFilter:n=>{const id=CIDX[n];if(id==null
   custInfo:n=>{const id=CIDX[n];return id==null?{id:null,rep:''}:{id,rep:K.curRep(id)}},onCust:id=>custDrawer(id),itemId:c=>IIDX[c],onItem:id=>itemDrawer(id),
   docCount:(n,ms)=>{const id=CIDX[n];if(id==null)return null;const rs=R.filter(r=>r.c===id&&r.a>0&&ms.includes(r.ym));const dm=groupBy(rs,'doc');return dm.size?{n:dm.size,avg:sum(rs)/dm.size}:null}})}
 
-K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감'],['profit','손익 분석 🔒']],controls,
+K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감'],['profit','손익 분석']],controls,
   draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCust,rep:tabRep,item:tabItem,ret:tabRet,profit:tabProfit})[tab](M)});
 })();
