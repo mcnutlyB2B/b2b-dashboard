@@ -180,6 +180,10 @@ def main():
             print(f'  {ym}: 매출 {r.loc[r.ym == ym, "원화판매금액"].sum():,.0f} → 거래명세서 {tx.loc[tx.ym == ym, "원화판매금액"].sum():,.0f} 로 대체')
             tx_meta.append(dict(m=ym, to=tx.loc[tx.ym == ym, 'date'].max()))
         r = pd.concat([r[~r['ym'].isin(tx['ym'])], tx], ignore_index=True).drop(columns='ym')
+    # 관리 제외 거래처: data/exclude/*.txt (파일 내용 첫 줄 = 거래처명). 대시보드 거래처 상세의 '관리 제외' 버튼으로 생성
+    excl = sorted({(open(f, encoding='utf-8').read().strip().splitlines() or [''])[0].strip() for f in glob.glob(os.path.join(ROOT, 'data', 'exclude', '*.txt'))} - {''})
+    if excl:
+        print(f'관리 제외 거래처 {len(excl)}곳: {excl}')
     n0 = len(r)
     r = r[~r['대표거래처'].isin(EXCLUDE_CUST)].copy()
     print(f'제외 거래처 {sorted(EXCLUDE_CUST)}: {n0 - len(r)}행')
@@ -197,7 +201,7 @@ def main():
     for page, part in [('atomy', r[is_at]), ('b2b', r[~is_at])]:
         data, s, q = pack(part, page == 'atomy')
         sums += s
-        data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF, tx=tx_meta)
+        data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF, tx=tx_meta, excl=excl)
         pe = profit_enc()
         data['penc'] = pe.get(page)
         data['chk'] = pe.get('chk')
