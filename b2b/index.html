@@ -827,7 +827,7 @@ function openCal(){
 <script>// B2B 채널 대시보드 (애터미 제외)
 (function(){
 const {D,R,MAX,MIN,BY,BM,S,pad,addD,days,eom,perName,yoyOf,won,amt,nf,delta,el,sum,groupBy,inR,dCell,shareCell,md,cadence,table,panel}=K;
-Object.assign(S,{type:'',rep:'',custSt:'',cq:'',iq:'',cat:'',basis:'cur',dmode:'cat',act:''});
+Object.assign(S,{type:'',rep:'',custSt:'',cq:'',iq:'',cat:'',basis:'cur',dmode:'cat',act:'',sub:'cust'});
 const catOf=r=>D.items[r.i][4]||'기타';
 // 유형 버튼: 최근 12개월 매출 큰 순
 const TYPES=[...groupBy(R,'t').values()].map(o=>({k:o.k,a:sum(o.rows.filter(r=>r.d>addD(MAX,-365)))})).sort((a,b)=>b.a-a.a).map(o=>o.k);
@@ -868,7 +868,20 @@ const STC={'신규':'st-new','재거래':'st-new','성장':'st-up','유지':'st-
 const pill=(s,c)=>el('span',{class:'pill '+(c||STC[s]),text:s});
 
 // ══ 매출 현황
+// 확인할 것 개수 (필터별 캐시)
+let CC0={};
+function counts(){const k=[S.type,S.rep,!!K.P].join('|');if(CC0.k===k)return CC0;
+  const rows=F(R,{noCat:true});const al=K.actionList(rows,'c');const lc=K.lostCalc(rows,'c');
+  const by=t=>al.filter(o=>o.st===t).length;
+  CC0={k,plan:by('발주 예정'),late:by('주기 초과'),long:by('장기 미발주'),lost:lc?lc.out.length:null,neg:K.profitNeg(PFILT)};return CC0}
+function todo(M){const c=counts();
+  K.todo(M,[{l:'발주 예정',n:c.plan,u:'곳',cls:'ok',tip:'다음 발주 예상일이 7일 이내',go:()=>K.go('action',{act:'발주 예정'})},
+    {l:'주기 초과',n:c.late,u:'곳',cls:'late',tip:'평균 발주 주기의 1.5배 넘게 주문 없음',go:()=>K.go('action',{act:'주기 초과'})},
+    {l:'장기 미발주',n:c.long,u:'곳',cls:'warn',tip:'평균 발주 주기의 3배 이상 주문 없음',go:()=>K.go('action',{act:'장기 미발주'})},
+    c.lost!=null?{l:'전년 대비 매출 감소',n:c.lost,u:'곳',cls:'warn',tip:'금년 거래 중단 또는 전년 동기 50% 미만',go:()=>K.go('action',{act:''},'lostp')}:null,
+    c.neg?{l:`적자 거래처 (${+c.neg.ym.slice(5)}월)`,n:c.neg.n,u:'곳',cls:'warn',tip:'손익 분석 최근 달 기준',go:()=>K.go('profit',{pm:c.neg.ym,pcf:'neg',pc:null,pi:null})}:null])}
 function tabSales(M){
+  todo(M);
   const y=yoyOf(S.f,S.t);
   const dr0=F(R,{noCat:true});
   K.progress(M,F(R),{note:S.type||S.rep||S.cat?`필터: ${[S.type,S.rep,S.cat].filter(Boolean).join(' · ')}.`:'',
@@ -886,12 +899,6 @@ function tabSales(M){
   const tm=groupBy(cur,'t'),pm=prev?groupBy(prev,'t'):new Map();
   TYPES.filter(t=>tm.has(t)||pm.has(t)).sort((a,b)=>(tm.get(b)?.a||0)-(tm.get(a)?.a||0)).forEach(t=>g.append(card(t,t,tm.get(t)?.a||0,y?(pm.get(t)?.a||0):null)));
   M.append(g);
-  K.top10(M,F(R),{title:'상위 10대 거래처 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k)});
-  // 월별
-  const mp=panel('월별 매출',`${S.type||'B2B 전체'}${S.rep?' · '+S.rep:''} · ※ 막대를 클릭하면 해당 월로 조회 기간이 변경됩니다`);
-  mp.append(K.legend([['var(--accent)',`${+S.t.slice(0,4)}년`],['var(--ghost)',`${+S.t.slice(0,4)-1}년`]]));
-  const mc=el('div',{class:'pb'});mp.append(mc);M.append(mp);
-  requestAnimationFrame(()=>K.monthly(mc,F(R)));
   // 거래처 / 품목 순위
   const fr=inR(F(R),S.f,S.t),fp=y?inR(F(R),y.f,y.t):null,ft=sum(fr);
   const g2=el('div',{class:'grid2'});
@@ -904,17 +911,31 @@ function tabSales(M){
   table(idv,{id:'topi',maxH:420,sort:{k:'a',d:-1},rows:[...im.values()].map(o=>({id:o.k,name:D.items[o.k][1],a:o.a,q:o.q,p:ipm?(ipm.get(o.k)?.a||0):null})),onRow:r=>itemDrawer(r.id),
     cols:[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:'품목',cls:'name',title:r=>r.name},{k:'q',l:'수량',n:1,f:r=>nf(r.q)},{k:'a',l:'매출',n:1,f:r=>amt(r.a),title:r=>won(r.a)},{k:'ch',l:'증감',n:1,f:r=>dCell(r.a,r.p),nosort:1},{k:'s',l:'비중',n:1,f:r=>shareCell(r.a,ft),nosort:1}]});
   g2.append(cp,ip);M.append(g2);
+  // 월별
+  const mp=panel('월별 매출',`${S.type||'B2B 전체'}${S.rep?' · '+S.rep:''} · ※ 막대를 클릭하면 해당 월로 조회 기간이 변경됩니다`);
+  mp.append(K.legend([['var(--accent)',`${+S.t.slice(0,4)}년`],['var(--ghost)',`${+S.t.slice(0,4)-1}년`]]));
+  const mc=el('div',{class:'pb'});mp.append(mc);M.append(mp);
+  requestAnimationFrame(()=>K.monthly(mc,F(R)));
 }
 
 // ══ 영업 액션
 function tabAction(M){
   M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 거래처별 발주 주기(최근 1년)로 판단합니다.${S.rep?' 담당: '+S.rep:''}${S.type?' · 유형: '+S.type:''}`}));
   K.actions(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),items:{label:'주요 구매 품목',fn:rs=>K.topItems(rs,k=>D.items[k][1])}});
+  K.top10(M,F(R),{title:'상위 10대 거래처 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k)});
+  K.lost(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),firstOf:k=>firstPos[k]||'9999'});
+}
+
+// ══ 거래처·품목 (거래처 / 품목 / 담당자 / 반품·차감)
+const SUBS=[['cust','거래처'],['item','품목'],['rep','담당자'],['ret','반품·차감']];
+function tabCP(M){
+  if(!SUBS.some(x=>x[0]===S.sub))S.sub='cust';
+  M.append(el('div',{class:'row subnav'},el('div',{class:'seg'},...SUBS.map(([k,l])=>el('button',{class:S.sub===k?'on':'',text:l,onclick:()=>{S.sub=k;K.render()}})))));
+  ({cust:tabCust,item:tabItem,rep:tabRep,ret:tabRet})[S.sub](M);
 }
 
 // ══ 거래처 관리
 function tabCust(M){
-  K.lost(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),firstOf:k=>firstPos[k]||'9999'});
   const y=yoyOf(S.f,S.t);const rows=custRows();
   const cnt={};rows.forEach(o=>{cnt[o.st]=(cnt[o.st]||0)+1});const nLate=rows.filter(o=>o.late).length;
   const nCur=rows.filter(o=>o.cur>0).length,nPrev=y?rows.filter(o=>o.prev>0).length:null;
@@ -1067,12 +1088,18 @@ function repDrawer(p){const key=S.basis==='cur'?'cp':'p';const all=F(R,{noRep:tr
 
 // ══ 수익성 (비밀번호)
 const CIDX=Object.fromEntries(D.custs.map((c,i)=>[c,i])),IIDX=Object.fromEntries(D.items.map((it,i)=>[it[0],i]));
-function tabProfit(M){K.profitTab(M,{custFilter:n=>{const id=CIDX[n];if(id==null)return !S.rep&&!S.type;return (!S.rep||K.curRep(id)===S.rep)&&(!S.type||D.types[D.custType[id]]===S.type)},
+function PFILT(n){const id=CIDX[n];if(id==null)return !S.rep&&!S.type;return (!S.rep||K.curRep(id)===S.rep)&&(!S.type||D.types[D.custType[id]]===S.type)}
+function tabProfit(M){K.profitTab(M,{custFilter:PFILT,
   custInfo:n=>{const id=CIDX[n];return id==null?{id:null,rep:''}:{id,rep:K.curRep(id)}},onCust:id=>custDrawer(id),itemId:c=>IIDX[c],onItem:id=>itemDrawer(id),
   docCount:(n,ms)=>{const id=CIDX[n];if(id==null)return null;const rs=R.filter(r=>r.c===id&&r.a>0&&ms.includes(r.ym));const dm=groupBy(rs,'doc');return dm.size?{n:dm.size,avg:sum(rs)/dm.size}:null}})}
 
-K.start({tabs:[['sales','매출 현황'],['action','영업 액션'],['cust','거래처 관리'],['rep','담당자'],['item','품목'],['ret','반품·차감'],['profit','손익 분석']],controls,
-  draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCust,rep:tabRep,item:tabItem,ret:tabRet,profit:tabProfit})[tab](M)});
+// 예전 탭 주소(#item 등) → 거래처·품목 탭
+{const h=location.hash.slice(1);if(['item','rep','ret'].includes(h)){S.sub=h;try{history.replaceState(null,'','#cust')}catch(e){}}}
+K.start({tabs:[['sales','현황'],
+  ['action','영업 관리',{noPer:true,badge:()=>{const c=counts();return c.plan+c.late||null},badgeTip:'발주 예정 + 주기 초과 거래처 수'}],
+  ['cust','거래처·품목'],
+  ['profit','손익 분석',{warn:true,badge:()=>counts().neg?.n||null,badgeTip:'최근 달 적자 거래처 수'}]],controls,
+  draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCP,profit:tabProfit})[tab](M)});
 })();
 </script>
 <!--/BODY--></body></html>
