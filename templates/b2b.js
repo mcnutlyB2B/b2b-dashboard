@@ -1,7 +1,7 @@
 // B2B 채널 대시보드 (애터미 제외)
 (function(){
 const {D,R,MAX,MIN,BY,BM,S,pad,addD,days,eom,perName,yoyOf,won,amt,nf,delta,el,sum,groupBy,inR,dCell,shareCell,md,cadence,table,panel}=K;
-Object.assign(S,{type:'',rep:'',custSt:'',cq:'',iq:'',cat:'',basis:'cur',dmode:'cat',act:'',sub:'cust'});
+Object.assign(S,{type:'',rep:'',custSt:'',cq:'',iq:'',cat:'',basis:'cur',dmode:'cat',act:'',sub:'cust',cls:'mg'});
 const catOf=r=>D.items[r.i][4]||'기타';
 // 유형 버튼: 최근 12개월 매출 큰 순
 const TYPES=[...groupBy(R,'t').values()].map(o=>({k:o.k,a:sum(o.rows.filter(r=>r.d>addD(MAX,-365)))})).sort((a,b)=>b.a-a.a).map(o=>o.k);
@@ -13,6 +13,12 @@ const dot=t=>el('span',{style:`display:inline-block;width:8px;height:8px;border-
 const F=(rows,o={})=>rows.filter(r=>(o.noType||!S.type||r.t===S.type)&&(o.noRep||!S.rep||r.cp===S.rep)&&(o.noCat||!S.cat||catOf(r)===S.cat));
 const firstPos={};R.forEach(r=>{if(r.a>0&&(!firstPos[r.c]||r.d<firstPos[r.c]))firstPos[r.c]=r.d});
 const newOK=()=>S.f>=addD(MIN,365);
+// 거래 유형(정기/간헐/1회성)과 관리 제외 거래처
+const CLS=K.custClass(R,'c');
+const EXCL=new Set((D.meta.excl||[]).map(n=>D.custs.indexOf(n)).filter(i=>i>=0));
+const GH='https://github.com/mcnutlyB2B/b2b-dashboard';
+const exclUrl=n=>`${GH}/new/main/data/exclude?filename=${encodeURIComponent(n.replace(/[\\/:*?"<>|]/g,'_'))}.txt&value=${encodeURIComponent(n)}`;
+const mgKeys=()=>new Set(F(R,{noCat:true}).map(r=>r.c));
 
 function controls(ctl){
   const tr=el('div',{class:'row'},el('span',{class:'lab',text:'유형'}));
@@ -28,14 +34,14 @@ function custRows(){
   const y=yoyOf(S.f,S.t);const rows=F(R);const by=groupBy(rows,'c');const out=[];
   by.forEach((o,c)=>{const rs=o.rows;
     const cur=sum(inR(rs,S.f,S.t)),prev=y?sum(inR(rs,y.f,y.t)):null,ly=sum(rs.filter(r=>r.y===BY-1)),ytd=sum(rs.filter(r=>r.y===BY));
-    const cad=cadence(R.filter(r=>r.c===c));
+    const mc=CLS.get(c)||{};
     let st;
     if(cur>0&&newOK()&&firstPos[c]>=S.f)st='신규';
     else if(cur>0)st=!prev||prev<=0?(y?'신규':'거래'):cur>prev*1.1?'성장':cur<prev*0.9?'감소':'유지';
     else st=prev>0?'이탈':'미거래';
     if(st==='신규'&&!(firstPos[c]>=S.f))st='재거래';
     out.push({id:c,name:D.custs[c],type:D.types[D.custType[c]],rep:K.curRep(c),cur,prev,ly,ytd,ch:prev?(cur-prev)/Math.abs(prev):null,
-      n:cad.n,gap:cad.gap,last:cad.last,since:cad.since,next:cad.next,late:cad.late&&cad.since<=365,st})});
+      cls:EXCL.has(c)?'제외':mc.cls||'1회성',nm:mc.nm||0,lastYm:mc.lastYm,miss:mc.cls==='정기'&&mc.prev>0&&mc.cur<=0&&!EXCL.has(c),st})});
   return out;
 }
 const STC={'신규':'st-new','재거래':'st-new','성장':'st-up','유지':'st-keep','거래':'st-keep','감소':'st-down','이탈':'st-risk','미거래':'st-dorm'};
@@ -45,13 +51,12 @@ const pill=(s,c)=>el('span',{class:'pill '+(c||STC[s]),text:s});
 // 확인할 것 개수 (필터별 캐시)
 let CC0={};
 function counts(){const k=[S.type,S.rep,!!K.P].join('|');if(CC0.k===k)return CC0;
-  const rows=F(R,{noCat:true});const al=K.actionList(rows,'c');const lc=K.lostCalc(rows,'c');
-  const by=t=>al.filter(o=>o.st===t).length;
-  CC0={k,plan:by('발주 예정'),late:by('주기 초과'),long:by('장기 미발주'),lost:lc?lc.out.length:null,neg:K.profitNeg(PFILT)};return CC0}
+  const ml=K.monthList(CLS,{excl:EXCL,keys:mgKeys()});const lc=K.lostCalc(F(R,{noCat:true}).filter(r=>!EXCL.has(r.c)),'c');
+  const by=t=>ml.filter(o=>o.st===t).length;
+  CC0={k,miss:by('이번 달 미출고'),gone:by('2개월 이상 미거래'),lost:lc?lc.out.length:null,neg:K.profitNeg(PFILT)};return CC0}
 function todo(M){const c=counts();
-  K.todo(M,[{l:'발주 예정',n:c.plan,u:'곳',cls:'ok',tip:'다음 발주 예상일이 7일 이내',go:()=>K.go('action',{act:'발주 예정'})},
-    {l:'주기 초과',n:c.late,u:'곳',cls:'late',tip:'평균 발주 주기의 1.5배 넘게 주문 없음',go:()=>K.go('action',{act:'주기 초과'})},
-    {l:'장기 미발주',n:c.long,u:'곳',cls:'warn',tip:'평균 발주 주기의 3배 이상 주문 없음',go:()=>K.go('action',{act:'장기 미발주'})},
+  K.todo(M,[{l:'이번 달 미출고',n:c.miss,u:'곳',cls:'late',tip:'정기 거래처 중 지난달엔 거래했는데 이번 달 아직 출고 없음',go:()=>K.go('action',{act:'이번 달 미출고'})},
+    {l:'2개월 이상 미거래',n:c.gone,u:'곳',cls:'warn',tip:'정기·간헐 거래처 중 지난달과 이번 달 모두 거래 없음',go:()=>K.go('action',{act:'2개월 이상 미거래'})},
     c.lost!=null?{l:'전년 대비 매출 감소',n:c.lost,u:'곳',cls:'warn',tip:'금년 거래 중단 또는 전년 동기 50% 미만',go:()=>K.go('action',{act:''},'lostp')}:null,
     c.neg?{l:`적자 거래처 (${+c.neg.ym.slice(5)}월)`,n:c.neg.n,u:'곳',cls:'warn',tip:'손익 분석 최근 달 기준',go:()=>K.go('profit',{pm:c.neg.ym,pcf:'neg',pc:null,pi:null})}:null])}
 function tabSales(M){
@@ -94,10 +99,11 @@ function tabSales(M){
 
 // ══ 영업 액션
 function tabAction(M){
-  M.append(el('div',{class:'note',text:`기준일 ${MAX.replace(/-/g,'.')} 기준 · 기간 선택과 무관하게 거래처별 발주 주기(최근 1년)로 판단합니다.${S.rep?' 담당: '+S.rep:''}${S.type?' · 유형: '+S.type:''}`}));
-  K.actions(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),items:{label:'주요 구매 품목',fn:rs=>K.topItems(rs,k=>D.items[k][1])}});
-  K.top10(M,F(R),{title:'상위 10대 거래처 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k)});
-  K.lost(M,F(R),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),firstOf:k=>firstPos[k]||'9999'});
+  M.append(el('div',{class:'note',text:`당월 ${+K.CYM.slice(5)}월 기준 · 거래처별 월 거래 여부로 판단합니다.${S.rep?' 담당: '+S.rep:''}${S.type?' · 유형: '+S.type:''}`}));
+  K.monthAct(M,CLS,{excl:EXCL,keys:mgKeys(),name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),items:{label:'주요 구매 품목',fn:rs=>K.topItems(rs,k=>D.items[k][1])}});
+  K.top10(M,F(R),{title:'상위 10대 거래처 집중 관리',key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),cls:CLS});
+  K.lost(M,F(R).filter(r=>!EXCL.has(r.c)),{key:'c',name:k=>D.custs[k],sub:k=>K.curRep(k),onRow:k=>custDrawer(k),firstOf:k=>firstPos[k]||'9999'});
+  if(EXCL.size)M.append(K.section(`직접 관리 제외한 거래처 ${EXCL.size}곳`,false,b=>{b.append(el('div',{class:'note',style:'padding:8px 16px'},[...EXCL].map(i=>D.custs[i]).join(', '),' · 해제는 ',el('a',{href:GH+'/tree/main/data/exclude',target:'_blank',rel:'noopener',text:'GitHub data/exclude 폴더'}),'에서 해당 파일을 삭제하세요.'))}));
 }
 
 // ══ 거래처·품목 (거래처 / 품목 / 담당자 / 반품·차감)
@@ -111,7 +117,8 @@ function tabCP(M){
 // ══ 거래처 관리
 function tabCust(M){
   const y=yoyOf(S.f,S.t);const rows=custRows();
-  const cnt={};rows.forEach(o=>{cnt[o.st]=(cnt[o.st]||0)+1});const nLate=rows.filter(o=>o.late).length;
+  const allRows=rows;const clsOk=o=>S.cls==='all'||(S.cls==='mg'?(o.cls==='정기'||o.cls==='간헐'):o.cls===S.cls);
+  const cnt={};rows.filter(clsOk).forEach(o=>{cnt[o.st]=(cnt[o.st]||0)+1});const nLate=rows.filter(o=>o.miss).length;
   const nCur=rows.filter(o=>o.cur>0).length,nPrev=y?rows.filter(o=>o.prev>0).length:null;
   const lost=rows.filter(o=>o.st==='이탈'),lostAmt=lost.reduce((s,o)=>s+o.prev,0);
   const neu=rows.filter(o=>o.st==='신규'),neuAmt=neu.reduce((s,o)=>s+o.cur,0);
@@ -120,26 +127,27 @@ function tabCust(M){
   g.append(mini('거래 실적 거래처',nf(nCur)+'곳',y?[dCell(nCur,nPrev),el('span',{class:'flat',text:`전년 동기 ${nPrev}곳`})]:'',''),
     mini('신규 거래처',nf(neu.length)+'곳',el('span',{class:'flat',text:newOK()?`매출 ${amt(neuAmt)} · 금년 첫 거래`:'판단에 1년치 이전 자료 필요'}),'신규'),
     mini('이탈 거래처',nf(lost.length)+'곳',el('span',{class:'down',text:y?`전년 동기 매출 ${amt(lostAmt)}`:'비교 기간 없음'}),'이탈'),
-    mini('주문 지연',nf(nLate)+'곳',el('span',{class:'flat',text:'평균 주문 간격의 1.5배 넘게 주문 없음'}),'지연'));
+    mini('이번 달 미출고',nf(nLate)+'곳',el('span',{class:'flat',text:'정기 거래처 중 이번 달 아직 출고 없음'}),'지연'));
   M.append(g);
   const p=panel('거래처 관리',`${perName(S.f,S.t)}${y?' vs 전년 동기':''} · ${rows.length}곳`);
+  const cc={};allRows.forEach(o=>{cc[o.cls]=(cc[o.cls]||0)+1});
+  p.append(el('div',{class:'tools'},el('span',{class:'lab',text:'거래 유형'}),...[['mg','관리 대상 (정기·간헐)',(cc['정기']||0)+(cc['간헐']||0)],['정기','정기',cc['정기']||0],['간헐','간헐',cc['간헐']||0],['1회성','1회성',cc['1회성']||0],['제외','직접 제외',cc['제외']||0],['all','전체',allRows.length]].filter(x=>x[2]||x[0]==='mg'||x[0]==='all').map(([k,l,n])=>el('button',{class:'chip'+(S.cls===k?' on':''),onclick:()=>{S.cls=k;K.render(true)}},`${l} ${n}`))));
   const chips=el('div',{class:'tools'});
-  [['','전체',rows.length],...['신규','재거래','성장','유지','감소','이탈','미거래'].filter(s=>cnt[s]).map(s=>[s,s,cnt[s]]),['지연','주문 지연',nLate]].forEach(([k,l,n])=>
+  [['','전체',rows.filter(clsOk).length],...['신규','재거래','성장','유지','감소','이탈','미거래'].filter(s=>cnt[s]).map(s=>[s,s,cnt[s]]),['지연','이번 달 미출고',nLate]].forEach(([k,l,n])=>
     chips.append(el('button',{class:'chip'+(S.custSt===k?' on':''),onclick:()=>setSt(S.custSt===k?'':k)},`${l} ${n}`)));
   p.append(chips);
-  p.append(el('div',{class:'note',style:'padding:6px 16px 0',text:'성장·감소: 전년 동기 대비 ±10% · 이탈: 전년 동기엔 거래, 이번 기간엔 없음 · 재거래: 전년 동기엔 없었지만 예전 거래 있음 · 주문 지연: 최근 1년 3회 이상 주문한 거래처 중 평균 간격의 1.5배(최소 +10일) 넘게 주문 없음 · 담당은 현재 담당'}));
+  p.append(el('div',{class:'note',style:'padding:6px 16px 0',text:'성장·감소: 전년 동기 대비 ±10% · 이탈: 전년 동기엔 거래, 이번 기간엔 없음 · 재거래: 전년 동기엔 없었지만 예전 거래 있음 · 거래 유형: 지난 12개월 중 6개월 이상 거래 = 정기, 2~5개월 = 간헐, 1개월 이하 = 1회성 · 담당은 현재 담당'}));
   const tools=el('div',{class:'tools'});const q=el('input',{id:'cq',type:'search',placeholder:'거래처 검색',value:S.cq});tools.append(q);p.append(tools);
   const td=el('div');p.append(td);
   const draw=()=>{td.innerHTML='';const k=S.cq.toLowerCase();
-    const rs=rows.filter(o=>(!S.custSt||(S.custSt==='지연'?o.late:o.st===S.custSt))&&(!k||o.name.toLowerCase().includes(k)));
+    const rs=rows.filter(o=>clsOk(o)&&(!S.custSt||(S.custSt==='지연'?o.miss:o.st===S.custSt))&&(!k||o.name.toLowerCase().includes(k)));
     table(td,{id:'cust',rows:rs,maxH:600,onRow:r=>custDrawer(r.id),redraw:draw,
       cols:[{l:'#',f:(r,i)=>i+1,cls:'rk'},{k:'name',l:'거래처',cls:'name',title:r=>r.name},{k:'type',l:'유형'},{k:'rep',l:'담당'},
         {k:'cur',l:'기간 매출',n:1,f:r=>amt(r.cur),title:r=>won(r.cur)},{k:'prev',l:'전년 동기',n:1,f:r=>r.prev==null?'—':amt(r.prev)},{k:'ch',l:'증감',n:1,f:r=>dCell(r.cur,r.prev)},
         {k:'ly',l:`${BY-1}년`,n:1,f:r=>r.ly?amt(r.ly):'—'},{k:'ytd',l:`${BY}년 누계`,n:1,f:r=>r.ytd?amt(r.ytd):'—'},
-        {k:'n',l:'주문(1년)',n:1,f:r=>r.n?r.n+'회':'—',tip:'최근 1년 주문한 날 수'},{k:'gap',l:'평균 간격',n:1,f:r=>r.gap?r.gap+'일':'—'},
-        {k:'since',l:'최종 주문일',n:1,f:r=>r.last?el('span',{class:r.late?'st-late':'',text:`${r.last.slice(2).replace(/-/g,'.')} (${r.since}일 전)`}):'—'},
-        {k:'next',l:'차기 발주 예상일',n:1,f:r=>r.next?el('span',{class:r.late?'st-late':'',text:md(r.next)+(r.late?' 지남':'')}):'—'},
-        {k:'st',l:'상태',f:r=>el('span',{},pill(r.st),r.late?[' ',pill('지연','st-late')]:null)}]})};
+        {k:'cls',l:'거래 유형',f:r=>el('span',{class:'pill '+(r.cls==='정기'?'st-ok':r.cls==='간헐'?'st-keep':'st-dorm'),text:r.cls})},
+        {k:'nm',l:'거래 개월',n:1,f:r=>r.nm+'/12',tip:'지난 12개월 중 거래한 달 수'},{k:'lastYm',l:'최근 거래월',n:1,f:r=>r.lastYm?`${r.lastYm.slice(2,4)}.${r.lastYm.slice(5)}`:'—'},
+        {k:'st',l:'상태',f:r=>el('span',{},pill(r.st),r.miss?[' ',pill('이번 달 미출고','st-late')]:null)}]})};
   q.oninput=()=>{S.cq=q.value;draw()};draw();M.append(p);
 }
 function setSt(st){S.custSt=st;const sk={'이탈':'prev','미거래':'ly','지연':'ly'}[st]||'cur';S.q.cust={k:sk,d:-1};K.render(true)}
@@ -234,30 +242,35 @@ const brk=(rows,prevRows,key,lab,name,onRow)=>{const m=groupBy(rows,key),pm=prev
   return{rows:[...keys].map(k=>({id:k,name:name(k),a:m.get(k)?.a||0,q:m.get(k)?.q||0,p:pm?(pm.get(k)?.a||0):null})).filter(r=>r.a||r.p),
     cols:[{k:'name',l:lab,cls:'name',title:r=>r.name},{k:'q',l:'수량',n:1,f:r=>nf(r.q)},{k:'a',l:'매출',n:1,f:r=>amt(r.a),title:r=>won(r.a)},{k:'p',l:'전년 동기',n:1,f:r=>r.p==null?'—':amt(r.p)},{k:'ch',l:'증감',n:1,f:r=>dCell(r.a,r.p),nosort:1},{k:'s',l:'비중',n:1,f:r=>shareCell(r.a,tt),nosort:1}],onRow}};
 function docList(rows,nameOf){const dm=groupBy(rows,'doc');return [...dm.values()].map(o=>({d:o.rows[0].d,name:nameOf(o.rows[0]),a:o.a,items:o.rows.map(r=>D.items[r.i][1]).slice(0,3).join(', ')+(o.rows.length>3?` 외 ${o.rows.length-3}`:'')}))}
-function common(dr,all,id,kindRows){
+function common(dr,all,id,mo){
   const y=yoyOf(S.f,S.t);const cur=inR(all,S.f,S.t),prev=y?inR(all,y.f,y.t):null;
-  const a=sum(cur),pa=prev?sum(prev):null,dx=delta(a,pa);const cad=cadence(all);
+  const a=sum(cur),pa=prev?sum(prev):null,dx=delta(a,pa);const mc=K.custClass(all,()=>0).get(0)||{};
   dr.append(K.stats([[perName(S.f,S.t),amt(a),'',won(a)],['전년 동기 대비',y?dx.t:'—',dx.c],[`${BY}년 누계`,amt(sum(all.filter(r=>r.y===BY)))],[`${BY-1}년 전체`,amt(sum(all.filter(r=>r.y===BY-1)))],
-    ['최종 주문일',cad.last?`${md(cad.last)} (${cad.since}일 전)`:'—',cad.late?'st-late':''],['주문 간격 · 차기 발주 예상일',cad.gap?`${cad.gap}일 · ${md(cad.next)}`:'—',cad.late?'st-late':'']]));
-  const mp=panel('월별 매출',`${BY}년 vs ${BY-1}년`);mp.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});mp.append(mc);dr.append(mp);K.monthly2(mc,all);
+    ['지난 12개월 거래',mc.nm!=null?`${mc.nm}개월 · ${mc.cls}`:'—'],['최근 거래월',mc.lastYm?`${mc.lastYm.slice(0,4)}.${mc.lastYm.slice(5)}${mc.cls==='정기'&&mc.prev>0&&mc.cur<=0?' · 이번 달 미출고':''}`:'—',mc.cls==='정기'&&mc.prev>0&&mc.cur<=0?'st-late':'']]));
+  const mp=panel('월별 매출',`${BY}년 vs ${BY-1}년 · ※ 막대를 클릭하면 그 달 상세가 아래에 열립니다`);mp.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc2=el('div',{class:'pb'});mp.append(mc2);dr.append(mp);
+  K.monthly2(mc2,all,mo?{sel:mo.sel,onPick:mo.onPick}:null);
+  if(mo&&mo.sel)dr.append(K.monthDetail(all,mo.sel,{groups:mo.groups,docs:mo.docs,onClose:()=>mo.onPick(null)}));
   return{cur,prev};
 }
-function custDrawer(id,sel){const all=R.filter(r=>r.c===id);
-  K.drawer(D.custs[id],`${D.types[D.custType[id]]} · 현재 담당 ${K.curRep(id)}`,dr=>{const{cur,prev}=common(dr,all,id);const pl=K.profitLine(D.custs[id]);if(pl)dr.append(pl);
-    const x=brk(cur,prev,'i','품목',k=>D.items[k][1],r=>custDrawer(id,sel===r.id?null:r.id));dr.append(K.section(`품목별 (${perName(S.f,S.t)}) · ※ 품목을 클릭하면 이 거래처의 월별 매출이 보입니다`,true,b=>table(b,{id:'dci',...x,maxH:320,sort:{k:'a',d:-1},rowCls:r=>r.id===sel?'on':'',redraw:()=>custDrawer(id,sel)})));
-    if(sel!=null)dr.append(K.selItem(all.filter(r=>r.i===sel),`${D.custs[id]} · ${D.items[sel][1]}`,()=>custDrawer(id),()=>itemDrawer(sel)));
-    const sx=brk(cur,prev,'s','사업장',k=>D.subs[k]);if(sx.rows.length>1)dr.append(K.section('사업장별',false,b=>table(b,{id:'dcs',...sx,maxH:320,sort:{k:'a',d:-1},redraw:()=>custDrawer(id)})));
+function custDrawer(id,sel,mon){const all=R.filter(r=>r.c===id);const nm=D.custs[id];
+  K.drawer(nm,`${D.types[D.custType[id]]} · 현재 담당 ${K.curRep(id)}`,dr=>{
+    dr.append(el('div',{class:'row',style:'margin:0 0 8px;gap:6px'},EXCL.has(id)?el('span',{class:'pill st-dorm',text:'관리 제외 거래처'}):null,
+      EXCL.has(id)?el('a',{class:'chip',href:GH+'/tree/main/data/exclude',target:'_blank',rel:'noopener',text:'관리 제외 해제 (GitHub)'}):el('a',{class:'chip',href:exclUrl(nm),target:'_blank',rel:'noopener',title:'GitHub에서 Commit changes만 누르면 영업 관리 목록에서 빠집니다',text:'관리 제외하기'})));
+    const{cur,prev}=common(dr,all,id,{sel:mon,onPick:m=>custDrawer(id,sel,m),groups:[{lab:'품목',key:'i',name:k=>D.items[k][1],onRow:k=>custDrawer(id,k,mon)}],docs:{lab:'사업장',name:r=>D.subs[r.s]}});const pl=K.profitLine(nm);if(pl)dr.append(pl);
+    const x=brk(cur,prev,'i','품목',k=>D.items[k][1],r=>custDrawer(id,sel===r.id?null:r.id,mon));dr.append(K.section(`품목별 (${perName(S.f,S.t)}) · ※ 품목을 클릭하면 이 거래처의 월별 매출이 보입니다`,true,b=>table(b,{id:'dci',...x,maxH:320,sort:{k:'a',d:-1},rowCls:r=>r.id===sel?'on':'',redraw:()=>custDrawer(id,sel,mon)})));
+    if(sel!=null)dr.append(K.selItem(all.filter(r=>r.i===sel),`${D.custs[id]} · ${D.items[sel][1]}`,()=>custDrawer(id,null,mon),()=>itemDrawer(sel)));
+    const sx=brk(cur,prev,'s','사업장',k=>D.subs[k]);if(sx.rows.length>1)dr.append(K.section('사업장별',false,b=>table(b,{id:'dcs',...sx,maxH:320,sort:{k:'a',d:-1},redraw:()=>custDrawer(id,sel,mon)})));
     const docs=docList(all.filter(r=>r.d>=addD(MAX,-364)),r=>D.subs[r.s]);
     dr.append(K.section(`최근 1년 출고 전표 ${docs.length}건`,false,b=>table(b,{id:'dcd',rows:docs,maxH:340,sort:{k:'d',d:-1},redraw:()=>custDrawer(id),cols:[{k:'d',l:'일자',f:r=>r.d.slice(2).replace(/-/g,'.')},{k:'name',l:'사업장',cls:'name',title:r=>r.name},{k:'items',l:'품목',cls:'name',title:r=>r.items},{k:'a',l:'금액',n:1,f:r=>amt(r.a),title:r=>won(r.a)}]})));
   })}
-function itemDrawer(id){const it=D.items[id];const all=F(R,{noType:true,noRep:true}).filter(r=>r.i===id);
-  K.drawer(it[1],`${it[0]} · ${it[2]} · ${it[4]}/${it[5]}`,dr=>{const{cur,prev}=common(dr,all,id);
-    const x=brk(cur,prev,'c','거래처',k=>D.custs[k],r=>custDrawer(r.id));dr.append(K.section(`거래처별 (${perName(S.f,S.t)})`,true,b=>table(b,{id:'dic',...x,maxH:360,sort:{k:'a',d:-1},redraw:()=>itemDrawer(id)})));
+function itemDrawer(id,mon){const it=D.items[id];const all=F(R,{noType:true,noRep:true}).filter(r=>r.i===id);
+  K.drawer(it[1],`${it[0]} · ${it[2]} · ${it[4]}/${it[5]}`,dr=>{const{cur,prev}=common(dr,all,id,{sel:mon,onPick:m=>itemDrawer(id,m),groups:[{lab:'거래처',key:'c',name:k=>D.custs[k],onRow:k=>custDrawer(k)}]});
+    const x=brk(cur,prev,'c','거래처',k=>D.custs[k],r=>custDrawer(r.id));dr.append(K.section(`거래처별 (${perName(S.f,S.t)})`,true,b=>table(b,{id:'dic',...x,maxH:360,sort:{k:'a',d:-1},redraw:()=>itemDrawer(id,mon)})));
   })}
-function repDrawer(p){const key=S.basis==='cur'?'cp':'p';const all=F(R,{noRep:true}).filter(r=>r[key]===p);
-  K.drawer(p,S.basis==='cur'?'현재 담당 거래처 기준':'전표 담당자 기준',dr=>{const{cur,prev}=common(dr,all,p);
-    const x=brk(cur,prev,'c','거래처',k=>D.custs[k],r=>custDrawer(r.id));dr.append(K.section(`거래처별 (${perName(S.f,S.t)})`,true,b=>table(b,{id:'drc',...x,maxH:380,sort:{k:'a',d:-1},redraw:()=>repDrawer(p)})));
-    const tx=brk(cur,prev,'t','유형',k=>k);dr.append(K.section('유형별',false,b=>table(b,{id:'drt',...tx,maxH:320,sort:{k:'a',d:-1},redraw:()=>repDrawer(p)})));
+function repDrawer(p,mon){const key=S.basis==='cur'?'cp':'p';const all=F(R,{noRep:true}).filter(r=>r[key]===p);
+  K.drawer(p,S.basis==='cur'?'현재 담당 거래처 기준':'전표 담당자 기준',dr=>{const{cur,prev}=common(dr,all,p,{sel:mon,onPick:m=>repDrawer(p,m),groups:[{lab:'거래처',key:'c',name:k=>D.custs[k],onRow:k=>custDrawer(k)}]});
+    const x=brk(cur,prev,'c','거래처',k=>D.custs[k],r=>custDrawer(r.id));dr.append(K.section(`거래처별 (${perName(S.f,S.t)})`,true,b=>table(b,{id:'drc',...x,maxH:380,sort:{k:'a',d:-1},redraw:()=>repDrawer(p,mon)})));
+    const tx=brk(cur,prev,'t','유형',k=>k);dr.append(K.section('유형별',false,b=>table(b,{id:'drt',...tx,maxH:320,sort:{k:'a',d:-1},redraw:()=>repDrawer(p,mon)})));
   })}
 
 // ══ 수익성 (비밀번호)
@@ -270,7 +283,7 @@ function tabProfit(M){K.profitTab(M,{custFilter:PFILT,
 // 예전 탭 주소(#item 등) → 거래처·품목 탭
 {const h=location.hash.slice(1);if(['item','rep','ret'].includes(h)){S.sub=h;try{history.replaceState(null,'','#cust')}catch(e){}}}
 K.start({tabs:[['sales','현황'],
-  ['action','영업 관리',{noPer:true,badge:()=>{const c=counts();return c.plan+c.late||null},badgeTip:'발주 예정 + 주기 초과 거래처 수'}],
+  ['action','영업 관리',{noPer:true,badge:()=>{const c=counts();return c.miss+c.gone||null},badgeTip:'이번 달 미출고 + 2개월 이상 미거래 거래처 수'}],
   ['cust','거래처·품목'],
   ['profit','손익 분석',{warn:true,badge:()=>counts().neg?.n||null,badgeTip:'최근 달 적자 거래처 수'}]],controls,
   draw:(tab,M)=>({sales:tabSales,action:tabAction,cust:tabCP,profit:tabProfit})[tab](M)});
