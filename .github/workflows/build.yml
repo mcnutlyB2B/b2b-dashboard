@@ -1,7 +1,7 @@
 name: 대시보드 빌드
 on:
   push:
-    paths: ['input/**', 'data/**', 'templates/**', 'scripts/**', '.github/workflows/build.yml']
+    paths: ['input/**', 'input_tx/**', 'data/**', 'templates/**', 'scripts/**', '.github/workflows/build.yml']
   workflow_dispatch:
 permissions:
   contents: write
