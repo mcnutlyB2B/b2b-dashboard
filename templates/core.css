@@ -229,3 +229,14 @@ details.panel .tw{margin:0;border-top:0}
 .tips ul{margin:6px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:5px}
 .tips .tk{display:inline-block;min-width:36px;margin-right:8px;font-size:11.5px;font-weight:600;color:var(--accent)}
 .legend-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:-8px}
+
+.tbadge{display:inline-block;margin-left:6px;min-width:18px;padding:0 6px;border-radius:9px;background:var(--panel2);color:var(--muted);font-size:11.5px;font-weight:600;line-height:18px;text-align:center}
+.tbadge.warn{background:color-mix(in srgb,var(--bad) 14%,var(--panel));color:var(--bad)}
+.tab.on .tbadge{background:var(--accent);color:#fff}
+.dimper>.chip{opacity:.45}.dimper>.chip:hover{opacity:1}.dimper>.note{margin-left:6px}
+.todo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 4px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.todo .tl{margin-right:4px;font-size:13px}
+.todo .ti{display:inline-flex;align-items:baseline;gap:6px;border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:4px 12px;cursor:pointer;color:var(--fg);font:inherit;font-size:13px}
+.todo .ti:hover{border-color:var(--muted)}.todo .ti b{font-variant-numeric:tabular-nums}
+.todo .ti.warn b{color:var(--bad)}.todo .ti.late b{color:var(--warn,#b7791f)}.todo .ti.ok b{color:var(--accent)}
+.subnav{margin:0 0 14px}
