@@ -60,9 +60,9 @@ def read_file(path):
     return r
 
 
-def load_all():
-    files = sorted(glob.glob(os.path.join(ROOT, 'input', '*.xlsx')), key=lambda p: (file_time(p), p))
-    print('입력 파일 (오래된 순):')
+def load_all(folder='input'):
+    files = sorted(glob.glob(os.path.join(ROOT, folder, '*.xlsx')), key=lambda p: (file_time(p), p))
+    print(f'{folder} 파일 (오래된 순):')
     merged = None
     for p in files:
         if os.path.basename(p).startswith('~$'):
@@ -171,6 +171,15 @@ def render(page, data, out_path, artifact=False):
 def main():
     artifact_dir = sys.argv[1] if len(sys.argv) > 1 else None
     r = load_all()
+    # 마감 전 달: input_tx/ 의 거래명세서 실적으로 그 달 전체를 대신한다 (매출 마감 후 해당 파일을 지우면 매출로 돌아감)
+    tx_meta = []
+    tx = load_all('input_tx') if glob.glob(os.path.join(ROOT, 'input_tx', '*.xlsx')) else None
+    if tx is not None and len(tx):
+        r['ym'] = r['date'].str[:7]; tx['ym'] = tx['date'].str[:7]
+        for ym in sorted(tx['ym'].unique()):
+            print(f'  {ym}: 매출 {r.loc[r.ym == ym, "원화판매금액"].sum():,.0f} → 거래명세서 {tx.loc[tx.ym == ym, "원화판매금액"].sum():,.0f} 로 대체')
+            tx_meta.append(dict(m=ym, to=tx.loc[tx.ym == ym, 'date'].max()))
+        r = pd.concat([r[~r['ym'].isin(tx['ym'])], tx], ignore_index=True).drop(columns='ym')
     n0 = len(r)
     r = r[~r['대표거래처'].isin(EXCLUDE_CUST)].copy()
     print(f'제외 거래처 {sorted(EXCLUDE_CUST)}: {n0 - len(r)}행')
@@ -188,7 +197,7 @@ def main():
     for page, part in [('atomy', r[is_at]), ('b2b', r[~is_at])]:
         data, s, q = pack(part, page == 'atomy')
         sums += s
-        data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF)
+        data['meta'] = dict(page=page, base=base, built=built, min=dmin, staff=STAFF, tx=tx_meta)
         pe = profit_enc()
         data['penc'] = pe.get(page)
         data['chk'] = pe.get('chk')
