@@ -111,7 +111,8 @@ K.selItem=(rows,name,onClose,onFull)=>{const p=el('section',{class:'panel selpan
   p.append(el('div',{class:'pb'},K.stats([[`${BY}년 누계`,amt(sum(yr))],[`${BY-1}년 전체`,amt(sum(rows.filter(r=>r.y===BY-1)))],['최종 주문일',last?last.slice(2).replace(/-/g,'.'):'—'],[`${BY}년 수량`,nf(sum(yr,'q'))],['평균 단가',q?nf(sum(pos)/q)+'원':'—'],['주문 횟수(금년)',new Set(yr.filter(r=>r.a>0).map(r=>r.d)).size+'회']])));
   p.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});p.append(mc);K.monthly2(mc,rows);
   setTimeout(()=>p.scrollIntoView({block:'start',behavior:'smooth'}),60);return p};
-K.start=page=>{K.page=page;K.autoUnlock();K.S0=JSON.parse(JSON.stringify(S));const h=location.hash.slice(1);S.tab=page.tabs.some(t=>t[0]===h)?h:page.tabs[0][0];render();
+K.start=page=>GATE.run(D.chk,pw=>{K.pw=pw;K.start0(page)});
+K.start0=page=>{K.page=page;K.autoUnlock();K.S0=JSON.parse(JSON.stringify(S));const h=location.hash.slice(1);S.tab=page.tabs.some(t=>t[0]===h)?h:page.tabs[0][0];render();
   let lw=window.innerWidth,tm;window.addEventListener('resize',()=>{if(window.innerWidth===lw)return;lw=window.innerWidth;clearTimeout(tm);tm=setTimeout(()=>render(true),200)})};
 
 // ── 막대그래프: 금년(진한 막대) 앞, 비교(연한 넓은 막대) 뒤. 막대 위 값.
@@ -352,13 +353,8 @@ K.topItems=(rows,nameOf,n=3)=>{const g=groupBy(rows.filter(r=>r.d>=D12),'i');ret
 
 // ── 수익성 (ERP 수익성분석지수 기반, 비밀번호로 암호화) — 적자 거래처 → 적자 품목 → 개선 포인트
 K.P=null;
-const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-K.unlock=async pw=>{const e=D.penc;if(!e)return false;
-  try{const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
-    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(e.salt),iterations:e.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
-    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.ct));
-    K.P=JSON.parse(new TextDecoder().decode(pt));try{sessionStorage.setItem('pp',pw)}catch(x){}return true}catch(x){return false}};
-K.autoUnlock=async()=>{if(K.P||!D.penc)return;let pw=null;try{pw=sessionStorage.getItem('pp')}catch(x){}if(pw)await K.unlock(pw)};
+K.unlock=async pw=>{const e=D.penc;if(!e||!pw)return false;try{K.P=await GATE.dec(e,pw);return true}catch(x){return false}};
+K.autoUnlock=async()=>{if(K.P||!D.penc)return;await K.unlock(K.pw||GATE.saved())};
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toFixed(1)+'%';
 const opCell=v=>el('span',{class:v<0?'loss':'',text:amt(v)});
 const gprCell=v=>el('span',{class:v!=null&&v<0?'loss':v!=null&&v<0.1?'st-late':'',text:pct(v)});
@@ -394,11 +390,8 @@ K.profitTab=async function(M0,{custFilter,custInfo,onCust,itemId,onItem,docCount
   const M=el('div',{class:'pwrap'});M0.append(M);
   await K.autoUnlock();
   if(!D.penc){M.append(el('div',{class:'empty',text:'수익성 자료가 아직 없습니다.'}));return}
-  if(!K.P||!K.P.ci){if(K.P&&!K.P.ci)K.P=null;const box=el('section',{class:'panel lock'});const inp=el('input',{id:'ppw',type:'password',placeholder:'비밀번호',autocomplete:'off'});const msg=el('div',{class:'note'});
-    const go=async()=>{msg.textContent='확인 중…';if(await K.unlock(inp.value))K.render(true);else msg.textContent='비밀번호가 맞지 않습니다.'};
-    inp.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
-    box.append(el('h2',{},'손익 분석',el('span',{class:'sub',text:'원가·이익 정보가 있어 비밀번호가 필요합니다'})),el('div',{class:'pb lockrow'},inp,el('button',{class:'btn pri',text:'확인',onclick:go}),msg));
-    M.append(box);setTimeout(()=>inp.focus(),50);return}
+  if(!K.P||!K.P.ci){K.P=null;M.append(el('section',{class:'panel lock'},el('h2',{},'손익 분석',el('span',{class:'sub',text:'손익 자료를 열 수 없습니다. 비밀번호가 바뀌었을 수 있습니다.'})),
+    el('div',{class:'pb lockrow'},el('button',{class:'btn pri',text:'비밀번호 다시 입력',onclick:()=>{GATE.clear();location.reload()}}))));return}
   const all=K.P.months;if(!S.pm||(S.pm!=='all'&&!all.includes(S.pm)))S.pm=all[all.length-1];
   const ms=S.pm==='all'?all:[S.pm];const plab=S.pm==='all'?`${+all[0].slice(5)}~${+all[all.length-1].slice(5)}월 누계`:`${+S.pm.slice(5)}월`;
   const erpMs=Object.keys(K.P.ca||{});
