@@ -201,28 +201,30 @@ function tabOrder(M){
 }
 
 // ── 서랍
-function common(dr,all){
+function common(dr,all,mo){
   const y=yoyOf(S.f,S.t);const cur=inR(all,S.f,S.t),prev=y?inR(all,y.f,y.t):null;const a=sum(cur),pa=prev?sum(prev):null,dx=delta(a,pa);const cad=cadence(all);
   dr.append(K.stats([[perName(S.f,S.t),amt(a),'',won(a)],['전년 동기 대비',y?dx.t:'—',dx.c],[`${BY}년 누계`,amt(sum(all.filter(r=>r.y===BY)))],[`${BY-1}년 전체`,amt(sum(all.filter(r=>r.y===BY-1)))],
     ['최종 주문일',cad.last?`${md(cad.last)} (${cad.since}일 전)`:'—',cad.late?'st-late':''],['주문 간격 · 차기 발주 예상일',cad.gap?`${cad.gap}일 · ${md(cad.next)}`:'—',cad.late?'st-late':'']]));
-  const mp=panel('월별 매출',`${BY}년 vs ${BY-1}년`);mp.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});mp.append(mc);dr.append(mp);K.monthly2(mc,all);
+  const mp=panel('월별 매출',`${BY}년 vs ${BY-1}년 · ※ 막대를 클릭하면 그 달 상세가 아래에 열립니다`);mp.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});mp.append(mc);dr.append(mp);
+  K.monthly2(mc,all,mo?{sel:mo.sel,onPick:mo.onPick}:null);
+  if(mo&&mo.sel)dr.append(K.monthDetail(all,mo.sel,{groups:mo.groups,docs:mo.docs,onClose:()=>mo.onPick(null)}));
   return{cur,prev};
 }
 const docCols=[{k:'d',l:'일자',f:r=>r.d.slice(2).replace(/-/g,'.')},{k:'cust',l:'거래처'},{k:'q',l:'수량',n:1,f:r=>nf(r.q)},{k:'a',l:'금액',n:1,f:r=>amt(r.a),title:r=>won(r.a)}];
-function mkDrawer(mk,sel){const all=F(R,{noMk:true}).filter(r=>r.mk===mk);
-  K.drawer(`${mk} 시장`,S.cust!==''?D.custs[+S.cust]:'애터미 전체',dr=>{const{cur,prev}=common(dr,all);
+function mkDrawer(mk,sel,mon){const all=F(R,{noMk:true}).filter(r=>r.mk===mk);
+  K.drawer(`${mk} 시장`,S.cust!==''?D.custs[+S.cust]:'애터미 전체',dr=>{const{cur,prev}=common(dr,all,{sel:mon,onPick:m=>mkDrawer(mk,sel,m),groups:[{lab:'품목',key:'i',name:k=>D.items[k][1],onRow:k=>mkDrawer(mk,k,mon)}],docs:{lab:'거래처',name:r=>D.custs[r.c]}});
     const im=groupBy(cur,'i'),pm=prev?groupBy(prev,'i'):null;const ids=[...new Set([...im.keys(),...(pm?pm.keys():[])])];
-    dr.append(K.section(`품목별 (${perName(S.f,S.t)}) · ※ 품목을 클릭하면 이 시장의 월별 매출이 보입니다`,true,b=>table(b,{id:'dmi',maxH:320,sort:{k:'a',d:-1},redraw:()=>mkDrawer(mk,sel),onRow:r=>mkDrawer(mk,sel===r.id?null:r.id),rowCls:r=>r.id===sel?'on':'',
+    dr.append(K.section(`품목별 (${perName(S.f,S.t)}) · ※ 품목을 클릭하면 이 시장의 월별 매출이 보입니다`,true,b=>table(b,{id:'dmi',maxH:320,sort:{k:'a',d:-1},redraw:()=>mkDrawer(mk,sel,mon),onRow:r=>mkDrawer(mk,sel===r.id?null:r.id,mon),rowCls:r=>r.id===sel?'on':'',
       rows:ids.map(k=>({id:k,name:D.items[k][1],q:im.get(k)?.q||0,a:im.get(k)?.a||0,p:pm?(pm.get(k)?.a||0):null})),
       cols:[{k:'name',l:'품목',cls:'name',title:r=>r.name},{k:'q',l:'수량',n:1,f:r=>nf(r.q)},{k:'a',l:'매출',n:1,f:r=>amt(r.a)},{k:'p',l:'전년 동기',n:1,f:r=>r.p==null?'—':amt(r.p)},{k:'ch',l:'증감',n:1,f:r=>dCell(r.a,r.p),nosort:1}]})));
-    if(sel!=null)dr.append(K.selItem(all.filter(r=>r.i===sel),`${mk} · ${D.items[sel][1]}`,()=>mkDrawer(mk),()=>itemDrawer(sel)));
+    if(sel!=null)dr.append(K.selItem(all.filter(r=>r.i===sel),`${mk} · ${D.items[sel][1]}`,()=>mkDrawer(mk,null,mon),()=>itemDrawer(sel)));
     const docs=docRows(all.filter(r=>r.d>=addD(MAX,-364)));
-    dr.append(K.section(`최근 1년 주문 ${docs.length}건`,false,b=>table(b,{id:'dmd',rows:docs,maxH:340,sort:{k:'d',d:-1},redraw:()=>mkDrawer(mk),cols:docCols})));
+    dr.append(K.section(`최근 1년 주문 ${docs.length}건`,false,b=>table(b,{id:'dmd',rows:docs,maxH:340,sort:{k:'d',d:-1},redraw:()=>mkDrawer(mk,sel,mon),cols:docCols})));
   })}
-function itemDrawer(id){const it=D.items[id];const all=F(R,{noMk:true}).filter(r=>r.i===id);
-  K.drawer(it[1],`${it[0]} · ${it[2]} · 시장 ${it[7]}`,dr=>{common(dr,all);
+function itemDrawer(id,mon){const it=D.items[id];const all=F(R,{noMk:true}).filter(r=>r.i===id);
+  K.drawer(it[1],`${it[0]} · ${it[2]} · 시장 ${it[7]}`,dr=>{common(dr,all,{sel:mon,onPick:m=>itemDrawer(id,m),groups:[{lab:'거래처',key:'c',name:k=>D.custs[k]}],docs:{lab:'거래처',name:r=>D.custs[r.c]}});
     const docs=docRows(all.filter(r=>r.d>=addD(MAX,-364)));
-    dr.append(K.section(`최근 1년 주문 ${docs.length}건`,true,b=>table(b,{id:'did',rows:docs,maxH:380,sort:{k:'d',d:-1},redraw:()=>itemDrawer(id),cols:docCols})));
+    dr.append(K.section(`최근 1년 주문 ${docs.length}건`,true,b=>table(b,{id:'did',rows:docs,maxH:380,sort:{k:'d',d:-1},redraw:()=>itemDrawer(id,mon),cols:docCols})));
   })}
 function docDrawer(doc){
   K.drawer(`${doc.cust} 주문`,`${doc.d.replace(/-/g,'.')} · 전표 ${D.docs[doc.doc]}`,dr=>{
