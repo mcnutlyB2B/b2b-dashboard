@@ -92,10 +92,13 @@ function drawTop(){
   (D.meta.tx||[]).forEach(t=>meta.append(' ',el('span',{class:'pill st-late',title:'매출 마감 전이라 이 달은 출고 실적(거래명세서)으로 집계합니다. 매출 마감 후 매출 기준으로 바뀝니다.',text:`${+t.m.slice(5)}월: 실적구분 '거래명세서' 기준 (마감 전)`})));
   const tr=document.querySelector('.titlerow');let tb=document.getElementById('tbtns');
   if(!tb){tb=el('div',{id:'tbtns',class:'tbtns'},el('a',{class:'tbtn',href:'../',text:'⌂ 메인'}),el('button',{class:'tbtn',text:'↺ 선택 초기화',title:'기간·필터·정렬을 처음 상태로 되돌립니다',onclick:()=>K.reset()}));tr.append(tb)}
-  const ctl=document.getElementById('ctl');ctl.innerHTML='';ctl.append(periodRow());
+  const ctl=document.getElementById('ctl');ctl.innerHTML='';const pr=periodRow();ctl.append(pr);
+  const curTab=K.page.tabs.find(t=>t[0]===S.tab)||[];
+  if(curTab[2]&&curTab[2].noPer){pr.classList.add('dimper');pr.append(el('span',{class:'note',text:`이 탭은 기준일 ${MAX.slice(5).replace('-','.')} 기준 (기간 선택 무관)`}))}
   K.page.controls&&K.page.controls(ctl);
   const tabs=document.getElementById('tabs');tabs.innerHTML='';
-  K.page.tabs.forEach(([k,l])=>tabs.append(el('button',{class:'tab'+(S.tab===k?' on':''),text:l,onclick:()=>{S.tab=k;try{history.replaceState(null,'','#'+k)}catch(e){}render();window.scrollTo(0,0)}})));
+  K.page.tabs.forEach(([k,l,o])=>{const n=o&&o.badge?o.badge():null;
+    tabs.append(el('button',{class:'tab'+(S.tab===k?' on':''),onclick:()=>K.go(k)},l,n?el('span',{class:'tbadge'+(o.warn?' warn':''),title:o.badgeTip||'',text:n}):null))});
 }
 const M=document.getElementById('main');
 function render(keep){
@@ -113,7 +116,13 @@ K.selItem=(rows,name,onClose,onFull)=>{const p=el('section',{class:'panel selpan
   p.append(K.legend([['var(--accent)',`${BY}년`],['var(--ghost)',`${BY-1}년`]]));const mc=el('div',{class:'pb'});p.append(mc);K.monthly2(mc,rows);
   setTimeout(()=>p.scrollIntoView({block:'start',behavior:'smooth'}),60);return p};
 K.start=page=>GATE.run(D.chk,pw=>{K.pw=pw;K.start0(page)});
-K.start0=page=>{K.page=page;K.autoUnlock();K.S0=JSON.parse(JSON.stringify(S));const h=location.hash.slice(1);S.tab=page.tabs.some(t=>t[0]===h)?h:page.tabs[0][0];render();
+K.go=(tab,patch,anchor)=>{Object.assign(S,patch||{});S.tab=tab;try{history.replaceState(null,'','#'+tab)}catch(e){}render();window.scrollTo(0,0);
+  if(anchor)setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({block:'start',behavior:'smooth'}),120)};
+// 오늘 확인할 것: [{l,n,cls,go:()=>{}}]
+K.todo=(host,items)=>{const its=items.filter(x=>x&&x.n!=null);if(!its.length)return;
+  host.append(el('div',{class:'todo'},el('span',{class:'tl'},el('b',{text:'오늘 확인할 것'}),el('span',{class:'note',text:` 기준일 ${MAX.slice(5).replace('-','.')}`})),
+    ...its.map(x=>el('button',{class:'ti '+(x.cls||''),title:x.tip||'',onclick:x.go},el('span',{text:x.l}),el('b',{text:x.n+(x.u||'')})))))};
+K.start0=page=>{K.page=page;K.autoUnlock().then(()=>{if(K.P)render(true)});K.S0=JSON.parse(JSON.stringify(S));const h=location.hash.slice(1);S.tab=page.tabs.some(t=>t[0]===h)?h:page.tabs[0][0];render();
   let lw=window.innerWidth,tm;window.addEventListener('resize',()=>{if(window.innerWidth===lw)return;lw=window.innerWidth;clearTimeout(tm);tm=setTimeout(()=>render(true),200)})};
 
 // ── 막대그래프: 금년(진한 막대) 앞, 비교(연한 넓은 막대) 뒤. 막대 위 값.
@@ -283,6 +292,7 @@ K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',win=3})
     return{k:o.k,name:name(o.k),sub:sub?sub(o.k):'',r12:o.a,mtd:sum(inR(all,mf,MAX)),lmtd:lmf>=MIN?sum(inR(all,lmf,lt)):null,lmfull:lmf>=MIN?sum(inR(all,lmf,lme)):null,
       ytd,lytd,gr:lytd?(ytd-lytd)/Math.abs(lytd):null,s:K.sig(all,win)}});
   const p=K.panel(title,`최근 12개월 매출 상위 10${unitLab==='거래처'?'곳':'개'} · 전년 수치는 전년 같은 날짜까지`);
+  p.id='top10p';
   p.append(el('div',{class:'siglegend'},
     el('div',{class:'lr'},el('b',{text:'성장률'}),el('span',{text:`금년 누계(1/1~${BM}/${BD})가 전년 같은 기간 누계보다 몇 % 늘었는지(▲) 줄었는지(▼)`})),
     el('div',{class:'lr'},el('b',{text:'신호'}),el('span',{class:'lgi'},...['급감','이탈 위험','주문 지연','성장'].map(t=>el('span',{class:'li'},K.tag(t),el('span',{text:TAGD[t](win)}))))) ));
@@ -298,14 +308,17 @@ K.top10=function(host,rows,{title,key,name,sub,onRow,unitLab='거래처',win=3})
   host.append(p);
 };
 // 영업 액션: 발주 주기 기준 (최근 1년 3회 이상 주문)
-K.actions=function(host,rows,{key,name,sub,onRow,items,unitLab='거래처'}){
-  const g=groupBy(rows,key);const list=[];const cw=unitLab==='거래처'?'곳':'개';
+K.actionList=(rows,key)=>{const g=groupBy(rows,key);const list=[];
   g.forEach((o,k)=>{const c=cadence(o.rows);if(!c.gap)return;
     let st=null;
     if(c.late)st=c.since>c.gap*3?'장기 미발주':'주기 초과';
     else if(c.next&&c.next>=MAX&&c.next<=addD(MAX,7))st='발주 예정';
     if(!st)return;
-    list.push({k,name:name(k),sub:sub?sub(k):'',st,gap:c.gap,last:c.last,since:c.since,over:c.since-c.gap,next:c.next,n:c.n,r12:sum(o.rows.filter(r=>r.d>=D12)),rows:o.rows})});
+    list.push({k,st,gap:c.gap,last:c.last,since:c.since,over:c.since-c.gap,next:c.next,n:c.n,r12:sum(o.rows.filter(r=>r.d>=D12)),rows:o.rows})});
+  return list};
+K.actions=function(host,rows,{key,name,sub,onRow,items,unitLab='거래처'}){
+  const cw=unitLab==='거래처'?'곳':'개';
+  const list=K.actionList(rows,key).map(o=>Object.assign(o,{name:name(o.k),sub:sub?sub(o.k):''}));
   const by=t=>list.filter(o=>o.st===t);
   const sel=S.act||'';
   const desc={'발주 예정':'다음 발주 예상일이 7일 이내','주기 초과':'최종 주문 후 평균 발주 주기의 1.5배~3배 경과','장기 미발주':'평균 발주 주기의 3배 이상 주문 없음 (이탈 가능성)'};
@@ -329,16 +342,21 @@ K.actions=function(host,rows,{key,name,sub,onRow,items,unitLab='거래처'}){
   host.append(el('div',{class:'foot',text:'※ 평균 발주 주기 = 최근 1년간 주문일 사이 평균 간격. 주기 초과 = 최종 주문 후 평균 발주 주기의 1.5배(최소 +10일)를 넘긴 경우. 표의 행을 클릭하면 상세 정보가 열립니다.'}));
 };
 // 전년 대비 매출 감소 현황 (금년 누계 vs 전년 같은 날짜까지, 전년 연간 기준 이상)
-K.lost=function(host,rows,{key,name,sub,onRow,minAmt=12e6,unitLab='거래처',firstOf}){
-  const lf=`${BY-1}-01-01`,lt=shiftY(MAX);if(lf<MIN)return;
+K.lostCalc=(rows,key,minAmt=12e6,firstOf)=>{
+  const lf=`${BY-1}-01-01`,lt=shiftY(MAX);if(lf<MIN)return null;
   const g=groupBy(rows,key);const out=[];let nNew=0,newAmt=0;
   g.forEach((o,k)=>{const ly=sum(o.rows.filter(r=>r.y===BY-1)),lytd=sum(inR(o.rows,lf,lt)),ytd=sum(o.rows.filter(r=>r.y===BY));
     if(firstOf&&ytd>0&&firstOf(k)>=`${BY}-01-01`){nNew++;newAmt+=ytd}
     if(ly<minAmt)return;let st=null;if(ytd<=0)st='이탈';else if(lytd>0&&ytd<lytd*0.5)st='급감';if(!st)return;
     const last=o.rows.filter(r=>r.a>0).reduce((m,r)=>r.d>m?r.d:m,'');
-    out.push({k,name:name(k),sub:sub?sub(k):'',st,ly,lytd,ytd,loss:ytd-lytd,last})});
+    out.push({k,st,ly,lytd,ytd,loss:ytd-lytd,last})});
+  return{out,nNew,newAmt}};
+K.lost=function(host,rows,{key,name,sub,onRow,minAmt=12e6,unitLab='거래처',firstOf}){
+  const lc=K.lostCalc(rows,key,minAmt,firstOf);if(!lc)return;const {nNew,newAmt}=lc;
+  const out=lc.out.map(o=>Object.assign(o,{name:name(o.k),sub:sub?sub(o.k):''}));
   const L=out.filter(o=>o.st==='이탈'),Dn=out.filter(o=>o.st==='급감');
   const p=K.panel('전년 대비 매출 감소 현황',`금년 누계(1/1~${+MAX.slice(5,7)}/${BD}) vs 전년 같은 날짜까지 · 전년 연매출 ${amt(minAmt)} 이상 ${unitLab} · 기간 선택과 무관`);
+  p.id='lostp';
   const sm=el('div',{class:'lostsum'},
     el('div',{},el('small',{text:'거래 중단 (금년 실적 없음)'}),el('b',{class:'down',text:`${L.length}${unitLab==='거래처'?'곳':'개'}`}),el('span',{class:'down',text:` ${amt(sum(L,'loss'))}`})),
     el('div',{},el('small',{text:'매출 급감 (전년 동기 50% 미만)'}),el('b',{class:'down',text:`${Dn.length}${unitLab==='거래처'?'곳':'개'}`}),el('span',{class:'down',text:` ${amt(sum(Dn,'loss'))}`})),
@@ -377,6 +395,10 @@ function pAgg(ms){
   I.forEach(fin);CI.forEach(fin);
   return{C,I,CI};
 }
+// 최근 달 적자 거래처(또는 품목) 수 — 탭 숫자·오늘 확인할 것
+K.profitNeg=(filter,kind='cust')=>{if(!K.P||!K.P.ci||!K.P.months.length)return null;const ym=K.P.months[K.P.months.length-1];const {C,CI}=pAgg([ym]);
+  if(kind==='item'){const IT=new Map();CI.forEach(x=>{if(!filter(x.c))return;IT.set(x.code,(IT.get(x.code)||0)+x.a-x.cogs-x.sga)});return{n:[...IT.values()].filter(v=>v<0).length,ym}}
+  return{n:[...C.values()].filter(o=>filter(o.name)&&o.op<0).length,ym}};
 function cause(o){if(o.op>=0)return null;if(o.a<=0)return '매출 없음';const m=o.opI<0,d=o.direct>0&&o.direct>=Math.abs(o.op)*0.3;return m&&d?'마진+비용':m?'마진 부족':d?'거래처 비용':'마진 부족'}
 const CAUSEC={'마진 부족':'st-risk','거래처 비용':'st-late','마진+비용':'st-risk','매출 없음':'st-dorm'};
 function streak(mon,ms){let n=0;for(let i=ms.length-1;i>=0;i--){const v=mon[ms[i]];if(v!=null&&v<0)n++;else break}return n}
